@@ -52,6 +52,7 @@ import {
   YOUTUBE_STATES,
   ZOOM_STEP,
   ZOOM_OUT_BELOW_100_SENSITIVITY,
+  ZOOM_IN_BELOW_100_SENSITIVITY,
   MIN_ZOOM,
   POINTER_EVENTS,
   TOOL_TYPE,
@@ -13705,14 +13706,16 @@ class App extends React.Component<AppProps, AppState> {
         // uniform at every zoom level. Zooming out now descends gradually and
         // can keep going (down to MIN_ZOOM) instead of collapsing to near-zero
         // in a single notch.
-        // Boost the step size only when zooming out below 100% (via a
-        // sensitivity constant), so zooming out there is slightly faster but
-        // still proportional — zoom-in and zoom above 100% are unaffected.
-        const zoomOutBelow100 =
-          this.state.zoom.value < 1 && sign > 0
-            ? ZOOM_OUT_BELOW_100_SENSITIVITY
+        // Boost the step size only when zooming below 100% (via a sensitivity
+        // constant per direction), so zooming in/out there is slightly faster
+        // but still proportional — zooming above 100% is unaffected.
+        const zoomStepSensitivity =
+          this.state.zoom.value < 1
+            ? sign > 0
+              ? ZOOM_OUT_BELOW_100_SENSITIVITY
+              : ZOOM_IN_BELOW_100_SENSITIVITY
             : 1;
-        let newZoom = this.state.zoom.value * (1 - (delta / 100) * zoomOutBelow100);
+        let newZoom = this.state.zoom.value * (1 - (delta / 100) * zoomStepSensitivity);
         // increase zoom steps the more zoomed-in we are (applies to >100% only)
         newZoom +=
           Math.log10(Math.max(1, this.state.zoom.value)) *
