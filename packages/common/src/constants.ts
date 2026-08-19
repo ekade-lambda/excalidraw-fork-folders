@@ -302,6 +302,14 @@ export const SCROLL_TIMEOUT = 100;
 export const ZOOM_STEP = 0.01; // Sensibilidad del zoom
 export const MIN_ZOOM = 0.00001;  // MINIMO (4 ceros, 1 numero)
 export const MAX_ZOOM = 10;   // MAXIMO
+/**
+ * Extra sensitivity for zoom-out steps below 100%. Values > 1 make zooming
+ * out faster (each wheel step still reduces zoom by a fixed ratio, so the
+ * step size stays uniform at every level — no exaggerated jumps). It only
+ * applies when zoom < 100% and zooming out; it does not affect zoom-in or
+ * zooming above 100%.
+ */
+export const ZOOM_OUT_BELOW_100_SENSITIVITY = 10;  //  sensibilidad menos de 100
 export const HYPERLINK_TOOLTIP_DELAY = 300;
 
 // Report a user inactive after IDLE_THRESHOLD milliseconds
