@@ -13699,7 +13699,12 @@ class App extends React.Component<AppProps, AppState> {
           delta = MAX_STEP * sign;
         }
 
-        let newZoom = this.state.zoom.value - delta / 100;
+        // Smooth, proportional zoom: each wheel step multiplies the current
+        // zoom by a fixed ratio (`1 ± delta/100`), so the step size stays
+        // uniform at every zoom level. Zooming out now descends gradually and
+        // can keep going (down to MIN_ZOOM) instead of collapsing to near-zero
+        // in a single notch.
+        let newZoom = this.state.zoom.value * (1 - delta / 100);
         // increase zoom steps the more zoomed-in we are (applies to >100% only)
         newZoom +=
           Math.log10(Math.max(1, this.state.zoom.value)) *

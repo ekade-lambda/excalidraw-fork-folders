@@ -252,6 +252,16 @@ export const actionResetZoom = register({
   },
   PanelComponent: ({ updateData }) => {
     const zoomValue = useAppStateValue((appState) => appState.zoom.value);
+    // Show more precision when zoomed far out so the smooth zoom-out steps
+    // remain perceptible below 10% (especially under 1%, where the previous
+    // integer rounding showed "0%" and made it seem nothing was changing).
+    const zoomPercent = zoomValue * 100;
+    const zoomLabel =
+      zoomPercent < 1
+        ? zoomPercent.toFixed(2)
+        : zoomPercent < 10
+          ? zoomPercent.toFixed(1)
+          : zoomPercent.toFixed(0);
     return (
       <Tooltip label={t("buttons.resetZoom")} style={{ height: "100%" }}>
         <IconButton
@@ -263,7 +273,7 @@ export const actionResetZoom = register({
             updateData(null);
           }}
         >
-          {(zoomValue * 100).toFixed(0)}%
+          {zoomLabel}%
         </IconButton>
       </Tooltip>
     );
