@@ -148,6 +148,8 @@ import "./index.scss";
 
 import { ExcalidrawPlusPromoBanner } from "./components/ExcalidrawPlusPromoBanner";
 import { AppSidebar } from "./components/AppSidebar";
+import { initializeBoardSystem } from "./boards/host/boardService";
+import { LocalStorageBoardRepository } from "./boards/repository/LocalStorageBoardRepository";
 
 import type { CollabAPI } from "./collab/Collab";
 
@@ -472,6 +474,15 @@ const ExcalidrawWrapper = () => {
   // collab room
   useSimulatedCollaborators(excalidrawAPI);
 
+  // Board System boot (composition root only — sin lógica de dominio aquí)
+  useEffect(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+    initializeBoardSystem(new LocalStorageBoardRepository()).catch((error) => {
+      console.error("BoardSystem: boot failed", error);
+    });
+  }, [excalidrawAPI]);
   // ---------------------------------------------------------------------------
   // Hoisted loadImages
   // ---------------------------------------------------------------------------
