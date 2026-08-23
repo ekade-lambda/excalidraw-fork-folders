@@ -7,6 +7,7 @@ import {
   useEditorInterface,
   ExcalidrawAPIProvider,
   useExcalidrawAPI,
+  viewportCoordsToSceneCoords,
 } from "@excalidraw/excalidraw";
 import { trackEvent } from "@excalidraw/excalidraw/analytics";
 import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
@@ -150,6 +151,9 @@ import { ExcalidrawPlusPromoBanner } from "./components/ExcalidrawPlusPromoBanne
 import { AppSidebar } from "./components/AppSidebar";
 import { initializeBoardSystem } from "./boards/host/boardService";
 import { LocalStorageBoardRepository } from "./boards/repository/LocalStorageBoardRepository";
+import { FolderToolButton } from "./boards/ui/ToolButtons";
+import { createFolder } from "./boards/host/folderService";
+import { boardsStoreActions } from "./boards/host/boardState";
 
 import type { CollabAPI } from "./collab/Collab";
 
@@ -482,6 +486,43 @@ const ExcalidrawWrapper = () => {
     initializeBoardSystem(new LocalStorageBoardRepository()).catch((error) => {
       console.error("BoardSystem: boot failed", error);
     });
+  }, [excalidrawAPI]);
+
+  // Board System — Folder tool (Fase 3): al soltar click con la custom tool,
+  // crea una folder visual bajo la carpeta actual.
+  useEffect(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+    const unsubscribe = excalidrawAPI.onPointerUp(
+      (activeTool, pointerDownState, event) => {
+        if (
+          !(activeTool.type === "custom" && activeTool.customType === "folder")
+        ) {
+          return;
+        }
+        const parentFolderId = boardsStoreActions.getCurrentFolderId();
+        if (!parentFolderId) {
+          return;
+        }
+        const { clientX, clientY } = event;
+        const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
+          { clientX, clientY },
+          excalidrawAPI.getAppState(),
+        );
+        createFolder({
+          repo: new LocalStorageBoardRepository(),
+          excalidrawAPI,
+          parentFolderId,
+          name: "Carpeta",
+          sceneX,
+          sceneY,
+        }).catch((error) => {
+          console.error("BoardSystem: create folder failed", error);
+        });
+      },
+    );
+    return unsubscribe;
   }, [excalidrawAPI]);
   // ---------------------------------------------------------------------------
   // Hoisted loadImages
@@ -1045,6 +1086,7 @@ const ExcalidrawWrapper = () => {
           theme={appTheme}
           refresh={() => forceRefresh((prev) => !prev)}
         />
+        {excalidrawAPI && <FolderToolButton excalidrawAPI={excalidrawAPI} />}
         <AppWelcomeScreen
           onCollabDialogOpen={onCollabDialogOpen}
           isCollabEnabled={!isCollabDisabled}
