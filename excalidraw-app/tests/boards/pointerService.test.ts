@@ -1,4 +1,5 @@
-﻿import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
+
 import { createPointerInCanvas } from "../../boards/host/pointerService";
 import { LocalStorageBoardRepository } from "../../boards/repository/LocalStorageBoardRepository";
 import { boardsStoreActions } from "../../boards/host/boardState";
@@ -30,11 +31,24 @@ describe("pointerService", () => {
       schemaVersion: 1,
       rootFolderId: "f_root",
       folders: {
-        f_root: { id: "f_root", name: "Root", parentId: null, boardId: "b_root", createdAt: 0, updatedAt: 0 },
+        f_root: {
+          id: "f_root",
+          name: "Root",
+          parentId: null,
+          boardId: "b_root",
+          createdAt: 0,
+          updatedAt: 0,
+        },
       },
       pointers: {},
       boards: {
-        b_root: { id: "b_root", name: "Root", rootFolderId: "f_root", createdAt: 0, updatedAt: 0 },
+        b_root: {
+          id: "b_root",
+          name: "Root",
+          rootFolderId: "f_root",
+          createdAt: 0,
+          updatedAt: 0,
+        },
       },
       lastOpenBoardId: "b_root",
     });
@@ -51,7 +65,9 @@ describe("pointerService", () => {
     });
 
     const graph = await repo.load();
-    const newFolder = Object.values(graph!.folders).find((f) => f.id !== "f_root");
+    const newFolder = Object.values(graph!.folders).find(
+      (f) => f.id !== "f_root",
+    );
 
     await createPointerInCanvas({
       repo,
@@ -64,17 +80,21 @@ describe("pointerService", () => {
 
     const newGraph = await repo.load();
     const pointer = Object.values(newGraph!.pointers)[0];
-    
+
     expect(pointer).toBeDefined();
     expect(pointer.targetFolderId).toBe(newFolder!.id);
     expect(pointer.name).toBe("MyPointer");
 
     // Check elements
     const primary = elements.find(
-      (el) => el.customData?.folderBoard?.kind === "pointer" && el.customData.folderBoard.role === "image"
+      (el) =>
+        el.customData?.folderBoard?.kind === "pointer" &&
+        el.customData.folderBoard.role === "image",
     );
     const text = elements.find(
-      (el) => el.customData?.folderBoard?.kind === "pointer" && el.customData.folderBoard.role === "text"
+      (el) =>
+        el.customData?.folderBoard?.kind === "pointer" &&
+        el.customData.folderBoard.role === "text",
     );
 
     expect(primary).toBeDefined();

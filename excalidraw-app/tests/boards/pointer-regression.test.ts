@@ -1,10 +1,12 @@
-﻿import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
+
+import { CaptureUpdateAction } from "@excalidraw/excalidraw";
+
 import { createPointerInCanvas } from "../../boards/host/pointerService";
 import { LocalStorageBoardRepository } from "../../boards/repository/LocalStorageBoardRepository";
 import { boardsStoreActions } from "../../boards/host/boardState";
 import { createFolder } from "../../boards/host/folderService";
 import { hitTestFolderAtPoint } from "../../boards/host/hitTest";
-import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 
 describe("pointerService Regression & Acceptance", () => {
   let repo: LocalStorageBoardRepository;
@@ -15,10 +17,10 @@ describe("pointerService Regression & Acceptance", () => {
   beforeEach(async () => {
     localStorage.clear();
     repo = new LocalStorageBoardRepository();
-    
+
     // Simulate an existing element on the board
     currentElements = [
-      { id: "existing-el-1", type: "rectangle", x: 10, y: 10 }
+      { id: "existing-el-1", type: "rectangle", x: 10, y: 10 },
     ];
 
     lastUpdateSceneOpts = null;
@@ -32,7 +34,13 @@ describe("pointerService Regression & Acceptance", () => {
           currentElements = opts.elements;
         }
       },
-      getAppState: () => ({ width: 1000, height: 800, scrollX: 50, scrollY: 50, zoom: { value: 1 } }),
+      getAppState: () => ({
+        width: 1000,
+        height: 800,
+        scrollX: 50,
+        scrollY: 50,
+        zoom: { value: 1 },
+      }),
     };
 
     boardsStoreActions.setCurrentBoardId("b_root");
@@ -41,11 +49,24 @@ describe("pointerService Regression & Acceptance", () => {
       schemaVersion: 1,
       rootFolderId: "f_root",
       folders: {
-        f_root: { id: "f_root", name: "Root", parentId: null, boardId: "b_root", createdAt: 0, updatedAt: 0 },
+        f_root: {
+          id: "f_root",
+          name: "Root",
+          parentId: null,
+          boardId: "b_root",
+          createdAt: 0,
+          updatedAt: 0,
+        },
       },
       pointers: {},
       boards: {
-        b_root: { id: "b_root", name: "Root", rootFolderId: "f_root", createdAt: 0, updatedAt: 0 },
+        b_root: {
+          id: "b_root",
+          name: "Root",
+          rootFolderId: "f_root",
+          createdAt: 0,
+          updatedAt: 0,
+        },
       },
       lastOpenBoardId: "b_root",
     });
@@ -74,7 +95,9 @@ describe("pointerService Regression & Acceptance", () => {
     });
 
     const graph = await repo.load();
-    const newFolder = Object.values(graph!.folders).find((f) => f.id !== "f_root");
+    const newFolder = Object.values(graph!.folders).find(
+      (f) => f.id !== "f_root",
+    );
     const originalElementsCount = currentElements.length;
 
     // RULE 1: Crear un pointer en un Board con elementos existentes
@@ -88,20 +111,28 @@ describe("pointerService Regression & Acceptance", () => {
     });
 
     // RULE 2: Verificar que los elementos existentes permanecen.
-    const existingElement = currentElements.find(el => el.id === "existing-el-1");
+    const existingElement = currentElements.find(
+      (el) => el.id === "existing-el-1",
+    );
     expect(existingElement).toBeDefined();
 
     // RULE 3: Verificar que el nuevo pointer aparece además de los elementos existentes.
     // The previous count was existing + folder visual (which is 2 elements: image + text). So 1 + 2 = 3.
     // Now we added another pointer (image + text), so 3 + 2 = 5.
     expect(currentElements.length).toBe(originalElementsCount + 2);
-    const pointerPrimary = currentElements.find(el => el.customData?.folderBoard?.kind === "pointer" && el.customData.folderBoard.role === "image");
+    const pointerPrimary = currentElements.find(
+      (el) =>
+        el.customData?.folderBoard?.kind === "pointer" &&
+        el.customData.folderBoard.role === "image",
+    );
     expect(pointerPrimary).toBeDefined();
 
     // RULE 4: Verificar que updateScene recibe la escena correcta.
     expect(lastUpdateSceneOpts.elements).toBeDefined();
-    expect(lastUpdateSceneOpts.captureUpdate).toBe(CaptureUpdateAction.IMMEDIATELY);
-    
+    expect(lastUpdateSceneOpts.captureUpdate).toBe(
+      CaptureUpdateAction.IMMEDIATELY,
+    );
+
     // RULE 5, 6, 7: Verificar que crear un pointer no altera scrollX, scrollY ni zoom.
     // En Excalidraw, si updateScene no recibe un appState parcial que modifique scroll/zoom, estos se mantienen intactos.
     // Como confirmamos que updateScene no recibe modificadores de appState:
@@ -127,8 +158,14 @@ describe("pointerService Regression & Acceptance", () => {
     // RULE 9: Verificar que después de recargar se conserva correctamente el estado esperado.
     const reloadedBoard = await repo.loadBoard("b_root");
     expect(reloadedBoard!.elements.length).toBe(5);
-    expect(reloadedBoard!.elements.find((el: any) => el.id === "existing-el-1")).toBeDefined();
-    expect(reloadedBoard!.elements.find((el: any) => el.customData?.folderBoard?.pointerId === pointerId)).toBeDefined();
+    expect(
+      reloadedBoard!.elements.find((el: any) => el.id === "existing-el-1"),
+    ).toBeDefined();
+    expect(
+      reloadedBoard!.elements.find(
+        (el: any) => el.customData?.folderBoard?.pointerId === pointerId,
+      ),
+    ).toBeDefined();
 
     // RULE 10: Verificar el doble clic del pointer y resolución de targetFolderId.
     // Para ello simulamos hitTest
