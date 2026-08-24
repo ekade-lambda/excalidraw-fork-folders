@@ -3,8 +3,11 @@ import { STORAGE_KEYS } from "../../app_constants";
 
 import { BOARD_SYSTEM_SCHEMA_VERSION } from "../types";
 
+import { applyDeletePatch } from "../domain/delete";
+
 import type { BoardRepository } from "./BoardRepository";
 import type { BoardData, BoardId, BoardsGraph } from "../types";
+import type { DeleteFolderPatch, DeletePointerPatch } from "../domain/delete";
 
 /** Migración de una versión concreta (de `from` a `from+1`). */
 export type GraphMigration = (g: BoardsGraph) => BoardsGraph;
@@ -203,5 +206,57 @@ export class LocalStorageBoardRepository implements BoardRepository {
 
   async deleteBoard(boardId: BoardId): Promise<void> {
     safeRemove(boardKey(boardId));
+  }
+
+  // ------------------------------------------------------------------
+  // Transactions
+  // ------------------------------------------------------------------
+
+  async applyTransaction(
+    initialGraph: BoardsGraph,
+    patch: DeleteFolderPatch | DeletePointerPatch,
+  ): Promise<BoardsGraph> {
+    const deletedBoards =
+      "deletedBoardIds" in patch ? patch.deletedBoardIds : [];
+
+    // 1. Encontrar pointers físicamente contenidos en los boards a eliminar
+    const discoveredPointerIds = new Set<string>();
+
+    // IMPORTANTE: Según diseño (Alternativa A), leemos ANTES de borrar.
+    for (const boardId of deletedBoards) {
+      // Obtenemos el board *sin* usar el caché en este nivel (o si lo hubiera, nos fiamos).
+      // Aquí estamos yendo directo al localStorage (o su equivalente lógico).
+      const payload = await this.loadBoard(boardId);
+      if (payload) {
+        for (const el of payload.elements) {
+          // Extraemos la metadata canónica
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const meta = (el as any).customData?.folderBoard;
+          if (meta?.kind === "pointer" && typeof meta.pointerId === "string") {
+            discoveredPointerIds.add(meta.pointerId);
+          }
+        }
+      }
+    }
+
+    // 2. Extender el parche del Domain con estos hallazgos
+    const finalPatch = { ...patch };
+    finalPatch.deletedPointerIds = [
+      ...patch.deletedPointerIds,
+      ...Array.from(discoveredPointerIds),
+    ];
+
+    // 3. Aplicar el parche al grafo lógicamente usando la función pura
+    const nextGraph = applyDeletePatch(initialGraph, finalPatch);
+
+    // 4. Ejecutar el borrado FÍSICO best-effort
+    for (const boardId of deletedBoards) {
+      await this.deleteBoard(boardId);
+    }
+
+    // 5. Escribir el nuevo grafo
+    await this.save(nextGraph);
+
+    return nextGraph;
   }
 }

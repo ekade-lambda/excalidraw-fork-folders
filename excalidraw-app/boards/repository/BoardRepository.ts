@@ -14,6 +14,7 @@
  */
 
 import type { BoardData, BoardId, BoardsGraph } from "../types";
+import type { DeleteFolderPatch, DeletePointerPatch } from "../domain/delete";
 
 export interface BoardRepository {
   /** Versión de esquema de la implementación. */
@@ -33,4 +34,16 @@ export interface BoardRepository {
 
   /** Elimina el payload de un board del storage. no-op si no existe. */
   deleteBoard(boardId: BoardId): Promise<void>;
+
+  /**
+   * Ejecuta una transacción de borrado transaccional best-effort.
+   * 1. Lee boards eliminados buscando Pointers huérfanos físicos.
+   * 2. Aplica el parche lógico al graph (incorporando esos pointers).
+   * 3. Borra los boards físicos.
+   * 4. Persiste el graph.
+   */
+  applyTransaction(
+    initialGraph: BoardsGraph,
+    patch: DeleteFolderPatch | DeletePointerPatch,
+  ): Promise<BoardsGraph>;
 }
