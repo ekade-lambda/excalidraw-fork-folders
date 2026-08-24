@@ -20,7 +20,10 @@ import type { ExcalidrawElement } from "@excalidraw/element/types";
 
 import type { BinaryFiles } from "@excalidraw/excalidraw/types";
 
-import type { ExcalidrawImperativeAPI, NormalizedZoomValue } from "@excalidraw/excalidraw/types";
+import type {
+  ExcalidrawImperativeAPI,
+  NormalizedZoomValue,
+} from "@excalidraw/excalidraw/types";
 
 import { createRootGraph } from "../domain/graph";
 import { STORAGE_KEYS } from "../../app_constants";
@@ -192,7 +195,7 @@ export function loadBoardIntoEditor(
   const editorState = excalidrawAPI.getAppState();
   excalidrawAPI.updateScene({
     elements: restored,
-    appState: { 
+    appState: {
       isLoading: false,
       zoom: { value: 1 as NormalizedZoomValue },
       scrollX: editorState.width / 2,
