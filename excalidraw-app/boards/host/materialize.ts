@@ -23,13 +23,22 @@ import type {
 import type { BoardId, FolderId } from "../types";
 
 /** Identidad de un elemento del Board System almacenada en customData. */
-export interface FolderBoardVisualMeta {
-  kind: "folder";
-  folderId: FolderId;
-  boardId: BoardId;
-  reprId: string;
-  role: "image" | "text";
-}
+export type FolderBoardVisualMeta =
+  | {
+      kind: "folder";
+      folderId: FolderId;
+      boardId: BoardId;
+      reprId: string;
+      role: "image" | "text";
+    }
+  | {
+      kind: "pointer";
+      pointerId: string;
+      targetFolderId: FolderId;
+      boardId: BoardId;
+      reprId: string;
+      role: "image" | "text";
+    };
 
 export interface FolderVisual {
   primary: ExcalidrawImageElement;
@@ -165,4 +174,76 @@ export function findFolderVisual(
     }
   }
   return primary || text ? { primary, text } : null;
+}
+
+export function buildPointerVisual(opts: {
+  pointerId: string;
+  targetFolderId: FolderId;
+  boardId: BoardId;
+  name: string;
+  sceneX: number;
+  sceneY: number;
+}): FolderVisual {
+  const reprId = newReprId();
+  const fileId = newFileId();
+  const groupId = newReprId(); // un random string que sirve de group id
+
+  // 1. Imagen por defecto
+  const dataUrl = buildFolderImageDataUrl();
+  const imageFile = buildFolderImageFile(fileId, dataUrl);
+
+  const baseImage = newImageElement({
+    type: "image",
+    x: opts.sceneX,
+    y: opts.sceneY,
+    width: FOLDER_SIZE,
+    height: (FOLDER_SIZE * 3) / 4,
+    fileId,
+    status: "saved",
+    groupIds: [groupId],
+    strokeColor: "transparent",
+    backgroundColor: "transparent",
+  });
+
+  const image = withMeta<ExcalidrawImageElement>(
+    baseImage as ExcalidrawImageElement,
+    {
+      kind: "pointer",
+      pointerId: opts.pointerId,
+      targetFolderId: opts.targetFolderId,
+      boardId: opts.boardId,
+      reprId,
+      role: "image",
+    },
+  );
+
+  // 2. Etiqueta (con prefijo ↗)
+  const label = opts.name.startsWith("↗") ? opts.name : `↗ ${opts.name}`;
+  const baseText = newTextElement({
+    x: opts.sceneX,
+    y: opts.sceneY + image.height + LABEL_GAP,
+    text: label,
+    originalText: label,
+    fontSize: LABEL_FONT_SIZE,
+    fontFamily: 1, // Virgil
+    textAlign: "center",
+    groupIds: [groupId],
+    strokeColor: "#000000",
+    backgroundColor: "transparent",
+    width: Math.max(FOLDER_SIZE, label.length * 10), // aprox
+  });
+
+  const text = withMeta<ExcalidrawTextElement>(
+    baseText as ExcalidrawTextElement,
+    {
+      kind: "pointer",
+      pointerId: opts.pointerId,
+      targetFolderId: opts.targetFolderId,
+      boardId: opts.boardId,
+      reprId,
+      role: "text",
+    },
+  );
+
+  return { primary: image, text, groupId, fileId, imageFile };
 }

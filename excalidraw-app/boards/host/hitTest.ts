@@ -20,6 +20,12 @@ import type { BoardId, FolderId } from "../types";
 
 export type HitResult =
   | { kind: "folder"; folderId: FolderId; boardId: BoardId }
+  | {
+      kind: "pointer";
+      pointerId: string;
+      targetFolderId: FolderId;
+      boardId: BoardId;
+    }
   | { kind: "none" };
 
 /** Tamaño del área de sensibilidad del doble clic (escena units). */
@@ -43,7 +49,7 @@ export function hitTestFolderAtPoint(
     const meta = el.customData?.folderBoard as
       | FolderBoardVisualMeta
       | undefined;
-    if (meta?.kind !== "folder") {
+    if (meta?.kind !== "folder" && meta?.kind !== "pointer") {
       continue;
     }
     if (
@@ -62,5 +68,21 @@ export function hitTestFolderAtPoint(
   if (!topHit) {
     return { kind: "none" };
   }
-  return { kind: "folder", folderId: topHit.folderId, boardId: topHit.boardId };
+
+  if (topHit.kind === "folder") {
+    return {
+      kind: "folder",
+      folderId: topHit.folderId,
+      boardId: topHit.boardId,
+    };
+  } else if (topHit.kind === "pointer") {
+    return {
+      kind: "pointer",
+      pointerId: topHit.pointerId,
+      targetFolderId: topHit.targetFolderId,
+      boardId: topHit.boardId,
+    };
+  }
+
+  return { kind: "none" };
 }

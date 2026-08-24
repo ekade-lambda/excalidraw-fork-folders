@@ -151,12 +151,19 @@ import { ExcalidrawPlusPromoBanner } from "./components/ExcalidrawPlusPromoBanne
 import { AppSidebar } from "./components/AppSidebar";
 import { initializeBoardSystem } from "./boards/host/boardService";
 import { LocalStorageBoardRepository } from "./boards/repository/LocalStorageBoardRepository";
-import { FolderToolButton } from "./boards/ui/ToolButtons";
 import { createFolder } from "./boards/host/folderService";
 import { boardsStoreActions } from "./boards/host/boardState";
 import { openFolder } from "./boards/host/boardService";
 import { hitTestFolderAtPoint } from "./boards/host/hitTest";
+import {
+  FOLDER_TOOL_CUSTOM_TYPE,
+  FOLDER_POINTER_TOOL_CUSTOM_TYPE,
+  FolderToolButton,
+  FolderPointerToolButton,
+} from "./boards/ui/ToolButtons";
 import { NavBar } from "./boards/ui/NavBar";
+import { PickerFolderDialog } from "./boards/ui/PickerFolderDialog";
+import { createPointerInCanvas } from "./boards/host/pointerService";
 
 import type { CollabAPI } from "./collab/Collab";
 
@@ -493,46 +500,54 @@ const ExcalidrawWrapper = () => {
     });
   }, [excalidrawAPI]);
 
-  // Board System — Folder tool (Fase 3): al soltar click con la custom tool,
-  // crea una folder visual bajo la carpeta actual.
+  const [pointerPickerPos, setPointerPickerPos] = useState<{
+    sceneX: number;
+    sceneY: number;
+  } | null>(null);
+
+  // Board System — Folder tool (Fase 3) y Pointer tool (Fase 6)
   useEffect(() => {
     if (!excalidrawAPI) {
       return;
     }
     const unsubscribe = excalidrawAPI.onPointerUp(
       (activeTool, pointerDownState, event) => {
-        if (
-          !(activeTool.type === "custom" && activeTool.customType === "folder")
-        ) {
+        if (activeTool.type !== "custom") {
           return;
         }
+
         const parentFolderId = boardsStoreActions.getCurrentFolderId();
         if (!parentFolderId) {
           return;
         }
+
         const { clientX, clientY } = event;
         const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
           { clientX, clientY },
           excalidrawAPI.getAppState(),
         );
-        createFolder({
-          repo: new LocalStorageBoardRepository(),
-          excalidrawAPI,
-          parentFolderId,
-          name: "Carpeta",
-          sceneX,
-          sceneY,
-        }).catch((error) => {
-          console.error("BoardSystem: create folder failed", error);
-        });
+
+        if (activeTool.customType === FOLDER_TOOL_CUSTOM_TYPE) {
+          createFolder({
+            repo: new LocalStorageBoardRepository(),
+            excalidrawAPI,
+            parentFolderId,
+            name: "Carpeta",
+            sceneX,
+            sceneY,
+          }).catch((error) => {
+            console.error("BoardSystem: create folder failed", error);
+          });
+        } else if (activeTool.customType === FOLDER_POINTER_TOOL_CUSTOM_TYPE) {
+          setPointerPickerPos({ sceneX, sceneY });
+        }
       },
     );
     return unsubscribe;
   }, [excalidrawAPI]);
 
-  // Board System — doble clic (Fase 4): si el punto cae sobre la representación
-  // de una Folder, abre su Board. Función glue; se enlaza onDoubleClick en el
-  // div contenedor (el dblclick del canvas burbujea hasta él), sin tocar core.
+  // Board System — doble clic (Fase 4 y 6): si el punto cae sobre la representación
+  // de una Folder o Pointer, abre su Board correspondiente.
   const handleCanvasDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!excalidrawAPI) {
       return;
@@ -543,13 +558,18 @@ const ExcalidrawWrapper = () => {
     );
     const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
     const hit = hitTestFolderAtPoint(elements, { x, y });
-    if (hit.kind !== "folder") {
+
+    if (hit.kind === "none") {
       return; // elemento normal → el editor conserva su comportamiento.
     }
+
+    const targetFolderId =
+      hit.kind === "folder" ? hit.folderId : hit.targetFolderId;
+
     void openFolder({
       repo: new LocalStorageBoardRepository(),
       excalidrawAPI,
-      folderId: hit.folderId,
+      folderId: targetFolderId,
     }).catch((error) => {
       console.error("BoardSystem: open folder failed", error);
     });
@@ -1089,6 +1109,7 @@ const ExcalidrawWrapper = () => {
               }}
             >
               <FolderToolButton excalidrawAPI={excalidrawAPI} />
+              <FolderPointerToolButton excalidrawAPI={excalidrawAPI} />
               <NavBar repo={boardRepo} excalidrawAPI={excalidrawAPI} />
             </div>
           );
@@ -1395,6 +1416,30 @@ const ExcalidrawWrapper = () => {
             appState={excalidrawAPI.getAppState()}
             scale={window.devicePixelRatio}
             ref={debugCanvasRef}
+          />
+        )}
+        {pointerPickerPos && excalidrawAPI && (
+          <PickerFolderDialog
+            repo={boardRepo}
+            onSelect={(folderId, folderName) => {
+              void createPointerInCanvas({
+                repo: boardRepo,
+                excalidrawAPI,
+                targetFolderId: folderId,
+                name: folderName,
+                sceneX: pointerPickerPos.sceneX,
+                sceneY: pointerPickerPos.sceneY,
+              }).catch((e) =>
+                console.error("BoardSystem: failed to create pointer", e),
+              );
+
+              setPointerPickerPos(null);
+              excalidrawAPI.setActiveTool({ type: "selection" });
+            }}
+            onClose={() => {
+              setPointerPickerPos(null);
+              excalidrawAPI.setActiveTool({ type: "selection" });
+            }}
           />
         )}
       </Excalidraw>

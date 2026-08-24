@@ -13,6 +13,7 @@ import React from "react";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 export const FOLDER_TOOL_CUSTOM_TYPE = "folder";
+export const FOLDER_POINTER_TOOL_CUSTOM_TYPE = "folderPointer";
 
 export const FolderToolButton = ({
   excalidrawAPI,
@@ -39,4 +40,27 @@ export const FolderToolButton = ({
   );
 };
 
-export default FolderToolButton;
+export const FolderPointerToolButton = ({
+  excalidrawAPI,
+}: {
+  excalidrawAPI: ExcalidrawImperativeAPI;
+}) => {
+  const activate = () => {
+    excalidrawAPI.setActiveTool({
+      type: "custom",
+      customType: FOLDER_POINTER_TOOL_CUSTOM_TYPE,
+      locked: true, // Queda lockeado hasta que el usuario decida en el picker
+    });
+  };
+
+  return (
+    <button
+      type="button"
+      title="Folder Pointer tool"
+      className="board-tool-button"
+      onClick={activate}
+    >
+      ↗️
+    </button>
+  );
+};
