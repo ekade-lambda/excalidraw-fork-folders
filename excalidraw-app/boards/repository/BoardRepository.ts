@@ -46,4 +46,15 @@ export interface BoardRepository {
     initialGraph: BoardsGraph,
     patch: DeleteFolderPatch | DeletePointerPatch,
   ): Promise<BoardsGraph>;
+
+  /**
+   * Clona físicamente una colección de Boards.
+   * Por cada entrada en el map, lee el Board origen, hace una copia independiente,
+   * le asigna el nuevo boardId y lo guarda.
+   * Si un origen no existe, lanza un error.
+   * Si el destino ya existe, lanza un error.
+   * Nota (Atomicidad): En la implementación actual (LocalStorage) esto es best-effort.
+   * Si falla a la mitad, algunos boards nuevos quedarán escritos. No modifica el Graph.
+   */
+  clonePhysicalBoards(oldToNewBoardMap: Map<BoardId, BoardId>): Promise<void>;
 }

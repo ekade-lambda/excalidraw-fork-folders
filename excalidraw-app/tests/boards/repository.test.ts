@@ -198,3 +198,80 @@ describe("Board System :: LocalStorageBoardRepository (Fase 1)", () => {
     );
   });
 });
+
+describe("BoardRepository :: clonePhysicalBoards", () => {
+  let repo: LocalStorageBoardRepository;
+  beforeEach(() => {
+    clearStorage();
+    repo = new LocalStorageBoardRepository();
+  });
+
+  it("clona exitosamente un único Board y verifica que es independiente", async () => {
+    const b1 = buildBoardData("b1", "Board Uno");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    b1.elements = [{ id: "el-1", type: "rectangle" } as any];
+    await repo.saveBoard(b1);
+
+    const map = new Map<string, string>([["b1", "b1-clon"]]);
+    await repo.clonePhysicalBoards(map);
+
+    const clon = await repo.loadBoard("b1-clon");
+    expect(clon).not.toBeNull();
+    expect(clon!.boardId).toBe("b1-clon");
+    expect(clon!.name).toBe("Board Uno");
+    expect(clon!.elements[0].id).toBe("el-1");
+
+    const orig = await repo.loadBoard("b1");
+    expect(orig).not.toBeNull();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    orig!.elements.push({ id: "el-2", type: "ellipse" } as any);
+    await repo.saveBoard(orig!);
+
+    const clonDespues = await repo.loadBoard("b1-clon");
+    expect(clonDespues!.elements.length).toBe(1);
+  });
+
+  it("clona exitosamente múltiples Boards", async () => {
+    await repo.saveBoard(buildBoardData("b1", "Uno"));
+    await repo.saveBoard(buildBoardData("b2", "Dos"));
+
+    const map = new Map<string, string>([
+      ["b1", "b1-clon"],
+      ["b2", "b2-clon"],
+    ]);
+    await repo.clonePhysicalBoards(map);
+
+    const c1 = await repo.loadBoard("b1-clon");
+    const c2 = await repo.loadBoard("b2-clon");
+    expect(c1!.name).toBe("Uno");
+    expect(c2!.name).toBe("Dos");
+  });
+
+  it("falla si el Board origen no existe (y aborta antes de escribir)", async () => {
+    await repo.saveBoard(buildBoardData("b1", "Uno"));
+
+    const map = new Map<string, string>([
+      ["b1", "b1-clon"],
+      ["missing", "missing-clon"],
+    ]);
+
+    await expect(repo.clonePhysicalBoards(map)).rejects.toThrow(
+      "clonePhysicalBoards: Source board missing not found.",
+    );
+
+    const c1 = await repo.loadBoard("b1-clon");
+    expect(c1).toBeNull();
+  });
+
+  it("falla si el destino ya existe", async () => {
+    await repo.saveBoard(buildBoardData("b1", "Uno"));
+    await repo.saveBoard(buildBoardData("b1-clon", "Ya Existo"));
+
+    const map = new Map<string, string>([["b1", "b1-clon"]]);
+
+    await expect(repo.clonePhysicalBoards(map)).rejects.toThrow(
+      "clonePhysicalBoards: Destination board b1-clon already exists.",
+    );
+  });
+});
