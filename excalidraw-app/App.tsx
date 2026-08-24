@@ -156,6 +156,7 @@ import { createFolder } from "./boards/host/folderService";
 import { boardsStoreActions } from "./boards/host/boardState";
 import { openFolder } from "./boards/host/boardService";
 import { hitTestFolderAtPoint } from "./boards/host/hitTest";
+import { NavBar } from "./boards/ui/NavBar";
 
 import type { CollabAPI } from "./collab/Collab";
 
@@ -398,6 +399,8 @@ const ExcalidrawWrapper = () => {
   const initialStatePromiseRef = useRef<{
     promise: ResolvablePromise<ExcalidrawInitialDataState | null>;
   }>({ promise: null! });
+  
+  const boardRepo = useMemo(() => new LocalStorageBoardRepository(), []);
   if (!initialStatePromiseRef.current.promise) {
     initialStatePromiseRef.current.promise =
       resolvablePromise<ExcalidrawInitialDataState | null>();
@@ -1072,6 +1075,17 @@ const ExcalidrawWrapper = () => {
         autoFocus={true}
         theme={editorTheme}
         onThemeChange={setAppTheme}
+        renderTopLeftUI={(isMobile, appState) => {
+          if (!excalidrawAPI) {
+            return null;
+          }
+          return (
+            <>
+              <FolderToolButton excalidrawAPI={excalidrawAPI} />
+              <NavBar repo={boardRepo} excalidrawAPI={excalidrawAPI} />
+            </>
+          );
+        }}
         renderTopRightUI={(isMobile) => {
           if (isMobile || !collabAPI || isCollabDisabled) {
             return null;
@@ -1114,7 +1128,6 @@ const ExcalidrawWrapper = () => {
           theme={appTheme}
           refresh={() => forceRefresh((prev) => !prev)}
         />
-        {excalidrawAPI && <FolderToolButton excalidrawAPI={excalidrawAPI} />}
         <AppWelcomeScreen
           onCollabDialogOpen={onCollabDialogOpen}
           isCollabEnabled={!isCollabDisabled}

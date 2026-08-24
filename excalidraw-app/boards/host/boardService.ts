@@ -28,9 +28,21 @@ import { STORAGE_KEYS } from "../../app_constants";
 import { BOARD_SYSTEM_SCHEMA_VERSION } from "../types";
 
 import { boardsStoreActions } from "./boardState";
+import {
+  navigateToHistory,
+  initializeHistory,
+  goBackInHistory,
+  goForwardInHistory,
+} from "./navigation";
 
 import type { BoardRepository } from "../repository/BoardRepository";
-import type { BoardData, BoardId, BoardsGraph, FolderId } from "../types";
+import type {
+  BoardData,
+  BoardId,
+  BoardsGraph,
+  FolderId,
+  NavEntry,
+} from "../types";
 
 const LEGACY_ELEMENTS_KEY = STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS;
 
@@ -100,6 +112,13 @@ function commitState(
   boardsStoreActions.setCurrentFolderId(currentFolderId);
   boardsStoreActions.setBoardData(boardData);
   boardsStoreActions.setReady(true);
+  // Registrar el entry inicial en el historial de navegación (Fase 5).
+  const entry: NavEntry = {
+    kind: "folder",
+    id: currentFolderId,
+    boardId: currentBoardId,
+  };
+  boardsStoreActions.setNavigationHistory(initializeHistory(entry));
 }
 /**
  * BOOT del Board System.
@@ -211,12 +230,10 @@ export async function saveCurrentBoard(
 }
 
 /**
- * Abre una Folder (dobl-click en su representación): guarda el board actual,
- * valida que la folder siga existiendo en el grafo, resuelve su boardId 1:1,
- * carga el contenido al editor, restaura viewport y actualiza el estado.
- * NO crea folder/board nuevos y NO corrompe el grafo.
+ * Carga una Folder en el editor SIN registrar navegación. Usado por openFolder,
+ * navigateBack, navigateForward y navigateToBreadcrumb.
  */
-export async function openFolder(opts: {
+async function openFolderInternal(opts: {
   repo: BoardRepository;
   excalidrawAPI: ExcalidrawImperativeAPI;
   folderId: FolderId;
@@ -267,4 +284,108 @@ export async function openFolder(opts: {
   await repo.save(graph);
 
   return { ok: true };
+}
+
+/**
+ * Abre una Folder (dobl-click en su representación): carga el board y registra
+ * la navegación en el historial. NO crea folder/board nuevos.
+ */
+export async function openFolder(opts: {
+  repo: BoardRepository;
+  excalidrawAPI: ExcalidrawImperativeAPI;
+  folderId: FolderId;
+}): Promise<{ ok: boolean; reason?: string }> {
+  const result = await openFolderInternal(opts);
+  if (!result.ok) {
+    return result;
+  }
+  // Registrar la navegación (abrir un destino nuevo).
+  const graph = await opts.repo.load();
+  if (graph) {
+    const folder = graph.folders[opts.folderId];
+    if (folder) {
+      const entry: NavEntry = {
+        kind: "folder",
+        id: folder.id,
+        boardId: folder.boardId,
+      };
+      const history = boardsStoreActions.getNavigationHistory();
+      boardsStoreActions.setNavigationHistory(
+        navigateToHistory(history, entry),
+      );
+    }
+  }
+  return result;
+}
+/**
+ * Navega hacia atrás en el historial. Guarda el board actual, carga el board
+ * destino y actualiza el historial. NO crea una nueva entrada de historial.
+ */
+export async function navigateBack(opts: {
+  repo: BoardRepository;
+  excalidrawAPI: ExcalidrawImperativeAPI;
+}): Promise<{ ok: boolean; reason?: string }> {
+  const { repo, excalidrawAPI } = opts;
+  const history = boardsStoreActions.getNavigationHistory();
+  const { history: newHistory, entry } = goBackInHistory(history);
+  if (!entry) {
+    return { ok: false, reason: "no-back" };
+  }
+  // Validar que la folder destino siga existiendo.
+  const graph = await repo.load();
+  if (!graph || !graph.folders[entry.id]) {
+    return { ok: false, reason: "folder-not-found" };
+  }
+  const result = await openFolderInternal({
+    repo,
+    excalidrawAPI,
+    folderId: entry.id,
+  });
+  if (result.ok) {
+    boardsStoreActions.setNavigationHistory(newHistory);
+  }
+  return result;
+}
+
+/**
+ * Navega hacia adelante en el historial. Guarda el board actual, carga el board
+ * destino y actualiza el historial. NO crea una nueva entrada de historial.
+ */
+export async function navigateForward(opts: {
+  repo: BoardRepository;
+  excalidrawAPI: ExcalidrawImperativeAPI;
+}): Promise<{ ok: boolean; reason?: string }> {
+  const { repo, excalidrawAPI } = opts;
+  const history = boardsStoreActions.getNavigationHistory();
+  const { history: newHistory, entry } = goForwardInHistory(history);
+  if (!entry) {
+    return { ok: false, reason: "no-forward" };
+  }
+  // Validar que la folder destino siga existiendo.
+  const graph = await repo.load();
+  if (!graph || !graph.folders[entry.id]) {
+    return { ok: false, reason: "folder-not-found" };
+  }
+  const result = await openFolderInternal({
+    repo,
+    excalidrawAPI,
+    folderId: entry.id,
+  });
+  if (result.ok) {
+    boardsStoreActions.setNavigationHistory(newHistory);
+  }
+  return result;
+}
+
+/**
+ * Navega a un ancestro desde el breadcrumb. Guarda el board actual, carga el
+ * board destino y registra la navegación en el historial.
+ */
+export async function navigateToBreadcrumb(opts: {
+  repo: BoardRepository;
+  excalidrawAPI: ExcalidrawImperativeAPI;
+  folderId: FolderId;
+}): Promise<{ ok: boolean; reason?: string }> {
+  // Es una navegación nueva (como abrir una folder), así que registra historial.
+  return openFolder(opts);
 }

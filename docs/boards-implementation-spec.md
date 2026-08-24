@@ -1,8 +1,6 @@
 # Especificación de implementación — Sistema de Boards Anidados
 
-**Repositorio:** `excalidraw-fork-folders` (monorepo Excalidraw, commit auditado `48d206cc`, rama `master`)
-**Estado:** especificación aprobada como base de trabajo. NO implementar aún.
-**Regla de oro:** EXCALIDRAW CORE = editor de escenas · BOARD SYSTEM = sistema de organización/navegación que vive **encima** del editor.
+**Repositorio:** `excalidraw-fork-folders` (monorepo Excalidraw, commit auditado `48d206cc`, rama `master`) **Estado:** especificación aprobada como base de trabajo. NO implementar aún. **Regla de oro:** EXCALIDRAW CORE = editor de escenas · BOARD SYSTEM = sistema de organización/navegación que vive **encima** del editor.
 
 ---
 
@@ -15,7 +13,7 @@ El **Board System** es una capa de **aplicación** alojada íntegramente en `exc
 ### 1.2 Capas y su pertenencia
 
 | Capa | Dónde vive | Responsabilidad |
-|---|---|---|
+| --- | --- | --- |
 | **Dominio** | `excalidraw-app/boards/domain/` | Modelo puro: `Board`, `Folder`, `FolderPointer`, `BoardsGraph`, `BoardData`, `NavigationHistory`. Lógica de árbol (ancestors/descendants/path/cycle), identidad, delete transaccional, copy/remap. **Sin React, sin core, sin localStorage.** |
 | **Infraestructura / Persistencia** | `excalidraw-app/boards/repository/` | `BoardRepository` (interfaz) + `LocalStorageBoardRepository`. Orquesta `localStorage` + IndexedDB existente. |
 | **UI** | `excalidraw-app/boards/ui/` | Overlays React: breadcrumb, back/forward, picker de destino de pointer, menú de contexto de folder, botones de herramientas. |
@@ -34,17 +32,19 @@ UI ──► servicios (host) ──► dominio ──► repository ──► l
 
 - Los **servicios** (`boards/services/`) son el único punto por el que la UI toca el dominio y el editor. `ExcalidrawWrapper` (en `excalidraw-app/App.tsx`) actúa como **composition root**: construye los servicios con el `excalidrawAPI` y los inyecta vía contexto/jotai.
 - El **dominio es síncrono y puro**; los servicios orquestan async (persistencia) y side-effects (editor).
-- El **estado del editor** sigue siendo fuente de verdad de la escena; el Board System solo conoce *qué board está abierto* (`currentBoardId`) y *dónde guardarlo*.
+- El **estado del editor** sigue siendo fuente de verdad de la escena; el Board System solo conoce _qué board está abierto_ (`currentBoardId`) y _dónde guardarlo_.
 
 ### 1.4 Dependencias permitidas / prohibidas
 
 **Permitidas:**
+
 - `domain` → tipos propios + `@excalidraw/common` (solo utilidades puras: `randomId`, coords) — preferir no depender ni del core.
 - `repository` → `domain` + `excalidraw-app/app_constants` + (opcional) `idb-keyval`.
 - `host/integración` → `domain`, `repository`, `@excalidraw/excalidraw` (API), `@excalidraw/element` (utilidades de elemento: `newElement`, `newElementWith`, `convertToExcalidrawElements`, `viewportCoordsToSceneCoords`, `hitElementItself`/`isPointInElement`, `ElementsMap`), `@excalidraw/common`.
 - `ui` → `domain`, `host/servicios`, jotai de `excalidraw-app`.
 
 **Prohibidas:**
+
 - `domain` → NO React, NO core (`@excalidraw/excalidraw`), NO `localStorage` directo, NO DOM.
 - `ui` y `host` → NO escribir `localStorage` directamente (siempre vía `BoardRepository`).
 - Ninguna capa → NO importar internos de `packages/excalidraw/components/App.tsx` (solo API pública e index exports).
@@ -68,6 +68,7 @@ UI ──► servicios (host) ──► dominio ──► repository ──► l
 **DECISIÓN: Folder y Board tienen relación 1:1.** Cada Folder real tiene exactamente un Board asociado (`Folder.boardId`), y cada Board pertenece a exactamente una Folder.
 
 **Justificación:**
+
 - "Ubicación" y "contenido" son dos caras de la misma entidad real: una carpeta no existe sin su contenido y al abrirla se navega a ese contenido.
 - Mantener DOS tipos separados (uno con `parentId`/nombre y otro con elementos) seguiría siendo 1:1 en la práctica, pero con doble bookkeeping y riesgo de desincronización.
 - Conservamos **dos IDENTIFICADORES distintos** (`Folder.id` y `Board.id`) aunque la cardinalidad sea 1:1: la carpeta puede moverse/renombrarse sin tocar la identidad del content-store, y el copy exige un `Board.id` nuevo aunque copiemos una carpeta. El vínculo es explícito: `Folder.boardId`.
@@ -78,47 +79,49 @@ UI ──► servicios (host) ──► dominio ──► repository ──► l
 
 ```ts
 // ===== IDs =====
-export type FolderId = string;          // UUID global (nanoid) — identidad GLOBAL
-export type FolderPointerId = string;   // UUID global — identidad GLOBAL (namespace propio)
-export type BoardId = string;           // UUID global — identidad GLOBAL
+export type FolderId = string; // UUID global (nanoid) — identidad GLOBAL
+export type FolderPointerId = string; // UUID global — identidad GLOBAL (namespace propio)
+export type BoardId = string; // UUID global — identidad GLOBAL
 
 // ===== Board (contenido) =====
 export interface Board {
-  id: BoardId;                     // identidad global, única
-  name: string;                    // nombre legible del board (derivado)
-  rootFolderId: FolderId;          // la Folder dueña de este board (1:1)
+  id: BoardId; // identidad global, única
+  name: string; // nombre legible del board (derivado)
+  rootFolderId: FolderId; // la Folder dueña de este board (1:1)
   createdAt: number;
   updatedAt: number;
   viewport?: BoardViewport | null; // SOLO mínimo restaurable, NO AppState completo
 }
 export interface BoardViewport {
-  scrollX: number; scrollY: number; zoom: number;
+  scrollX: number;
+  scrollY: number;
+  zoom: number;
 }
 
 // ===== Folder (nodo de ubicación real) =====
 export interface Folder {
-  id: FolderId;                    // identidad GLOBAL única
-  name: string;                    // NUNCA es identidad
+  id: FolderId; // identidad GLOBAL única
+  name: string; // NUNCA es identidad
   icon?: { dataUrl: string } | null; // icono custom (imagen) o default
-  parentId: FolderId | null;       // null => carpeta raíz (UNA ubicación oficial)
-  boardId: BoardId;                // 1:1 — el contenido de esta carpeta
+  parentId: FolderId | null; // null => carpeta raíz (UNA ubicación oficial)
+  boardId: BoardId; // 1:1 — el contenido de esta carpeta
   createdAt: number;
   updatedAt: number;
 }
 
 // ===== FolderPointer (referencia independiente) =====
 export interface FolderPointer {
-  id: FolderPointerId;             // identidad del POINTER (única, distinta del target)
-  targetFolderId: FolderId;        // → carpeta REAL
-  name?: string;                   // etiqueta visual del pointer (p. ej. "↗ Humano")
-  icon?: string | null;            // override visual opcional
+  id: FolderPointerId; // identidad del POINTER (única, distinta del target)
+  targetFolderId: FolderId; // → carpeta REAL
+  name?: string; // etiqueta visual del pointer (p. ej. "↗ Humano")
+  icon?: string | null; // override visual opcional
   createdAt: number;
 }
 
 // ===== Grafo global =====
 export interface BoardsGraph {
-  schemaVersion: number;           // MIGRACIONES FUTURAS
-  rootFolderId: FolderId;          // raíz (Folder con parentId:null)
+  schemaVersion: number; // MIGRACIONES FUTURAS
+  rootFolderId: FolderId; // raíz (Folder con parentId:null)
   folders: Record<FolderId, Folder>;
   pointers: Record<FolderPointerId, FolderPointer>;
   boards: Record<BoardId, Board>;
@@ -129,15 +132,19 @@ export interface BoardsGraph {
 export interface BoardData {
   schemaVersion: number;
   boardId: BoardId;
-  elements: ExcalidrawElement[];   // escena (incluye representaciones folder/pointer)
-  files: BinaryFiles;              // imágenes del contenido
+  elements: ExcalidrawElement[]; // escena (incluye representaciones folder/pointer)
+  files: BinaryFiles; // imágenes del contenido
   viewport?: BoardViewport | null;
   name: string;
   updatedAt: number;
 }
 
 // ===== Navegación (SEPARADA de parentId) =====
-export type NavEntry = { kind: "board" | "folder"; id: string; boardId: BoardId };
+export type NavEntry = {
+  kind: "board" | "folder";
+  id: string;
+  boardId: BoardId;
+};
 export interface NavigationHistory {
   back: NavEntry[];
   forward: NavEntry[];
@@ -147,7 +154,7 @@ export interface NavigationHistory {
 ### 2.3 Respuesta a las preguntas de identidad
 
 | Pregunta | Respuesta |
-|---|---|
+| --- | --- |
 | ¿Cuál es la raíz? | La `Folder` con `parentId === null`, referenciada por `BoardsGraph.rootFolderId`. Es una Folder como cualquier otra, con su `boardId` (board raíz). **No puede eliminarse ni retirarse de `rootFolderId`.** |
 | ¿Qué entidad posee `parentId`? | **Solo `Folder`**. `FolderPointer` NO tiene `parentId` y **no puede ser hijo** (es nodo del grafo de referencias, no del árbol). |
 | ¿Qué entidad posee el nombre? | `Folder.name` (nombre oficial). `FolderPointer.name` es una **etiqueta visual opcional**. `Board.name` es duplicado legible (derivado, no fuente de verdad). |
@@ -182,11 +189,12 @@ pointers["p_bio_humano"] = { id: "p_bio_humano", targetFolderId: "f_humano", …
 ```
 
 **Distinción técnica inequívoca Folder ≠ Pointer:**
+
 - Un objeto **Folder** vive en `BoardsGraph.folders` y tiene `parentId`, `boardId`, `icon`: tiene **ubicación oficial** y **contenido**.
 - Un objeto **FolderPointer** vive en `BoardsGraph.pointers` (namespace separado) y tiene `targetFolderId`, **sin** `parentId` ni `boardId`: no crea board ni carpeta ni cambia la ubicación de `f_humano`.
 - IDs en namespaces distintos: `FolderId` y `FolderPointerId` son tipos distintos; el id del pointer nunca se usa como `parentId`, por lo que una carpeta real no puede tener dos padres a través de un pointer.
 
-`/investigaciones/filosofía/humano` **no es** una ruta real: es una ruta *visual* que termina en un pointer. La ruta real de `f_humano` sigue siendo la de su `parentId`. La UI distingue "entré por un pointer" (nivel pointer) en el breadcrumb.
+`/investigaciones/filosofía/humano` **no es** una ruta real: es una ruta _visual_ que termina en un pointer. La ruta real de `f_humano` sigue siendo la de su `parentId`. La UI distingue "entré por un pointer" (nivel pointer) en el breadcrumb.
 
 ---
 
@@ -195,6 +203,7 @@ pointers["p_bio_humano"] = { id: "p_bio_humano", targetFolderId: "f_humano", …
 ### 3.1 Re-inspección de `LocalData` (hecho verificado)
 
 `excalidraw-app/data/LocalData.ts`:
+
 - `saveDataStateToLocalStorage(elements, appState)` escribe **siempre en las mismas 2 claves**: `localStorage["excalidraw"]` (elements no-deleted) y `localStorage["excalidraw-state"]` (appState limpio con `clearAppStateForLocalStorage`). Debounce de 300 ms.
 - `LocalData.save` está pensado para **UN solo board**. `LocalData.pauseSave/resumeSave` existe pero solo para locks tipo `"collaboration"`.
 - Imágenes: `LocalFileManager` persiste en IndexedDB `files-db/files-store` por `FileId` (ids globales, con GC `lastRetrieved` > 1 día).
@@ -204,7 +213,7 @@ pointers["p_bio_humano"] = { id: "p_bio_humano", targetFolderId: "f_humano", …
 ### 3.2 Qué se guarda dónde
 
 | Contenido | Destino | Clave/Store |
-|---|---|---|
+| --- | --- | --- |
 | Grafo del Board System (`schemaVersion`, `rootFolderId`, `folders`, `pointers`, `boards` índice, `lastOpenBoardId`) | localStorage | `excalidraw-boards-graph` |
 | `lastOpenBoardId` (restore on reload) | localStorage | (incluido en la clave anterior) |
 | Payload de cada board: `schemaVersion`, `boardId`, `elements`, `files`, `viewport`, `name` | localStorage | `excalidraw-board-<boardId>` |
@@ -266,7 +275,7 @@ Al arrancar, el Board System lee `excalidraw-boards-graph.lastOpenBoardId`. Si e
 ### 4.2 CREATE (crear folder → crea su board)
 
 | Campo | Detalle |
-|---|---|
+| --- | --- |
 | Estado inicial | Board padre abierto (`currentBoardId = A`, `currentFolderId = f_A`). |
 | Operación | `folderService.createFolder({ parentId: f_A, name, sceneX, sceneY })`. |
 | Datos modificados | Nuevo `Folder` (`id` nuevo, `parentId=f_A`, `boardId` nuevo), nuevo `Board` vacío; el primero sin padre se asigna como raíz. |
@@ -281,6 +290,7 @@ En `onChange` del editor (debounce) y de forma explícita antes de cada SWITCH: 
 ### 4.4 OPEN
 
 `boardService.openBoard(boardId)`:
+
 1. `saveCurrentBoard()` (persiste A).
 2. `NavigationHistory.push(current)` (ver §7).
 3. `data = BoardRepository.loadBoard(boardId)`; si null → crear vacío.
@@ -325,6 +335,7 @@ Current: A (board raíz, currentFolderId=rootA)
 ### 5.1 Composición elegida (sin nuevo `ExcalidrawElement`)
 
 Una Folder se materializa en el board padre como **2 elementos nativos**:
+
 1. **Imagen** (ExcalidrawImageElement) con la imagen por defecto de carpeta (SVG/dataURL) o el `icon` custom → **elemento primario** (define posición/tamaño).
 2. **Texto** (ExcalidrawTextElement) con `name` → **etiqueta**, debajo de la imagen.
 
@@ -333,13 +344,15 @@ Ambos se agrupan con un **`groupIds` compartido** (grupo de Excalidraw) para que
 ### 5.2 `customData` (identidad, no visual)
 
 Cada elemento visual lleva en `customData.folderBoard`:
+
 ```ts
 // Folder
 { kind: "folder", folderId, boardId, reprId, role: "image" | "text" }
 // Pointer
 { kind: "pointer", pointerId, targetFolderId, boardId, reprId, role: "image" | "text" }
 ```
-- `reprId`: id único de la *instancia visual* (par imagen+texto) → cohesionar el par aunque se copie/duplique.
+
+- `reprId`: id único de la _instancia visual_ (par imagen+texto) → cohesionar el par aunque se copie/duplique.
 - `folderId`/`pointerId`: enlace con el dominio.
 - `boardId`: board en cuyo canvas vive la representación.
 - La posición NO es identidad: se deriva solo del elemento primario al abrir/posicionar.
@@ -353,7 +366,7 @@ Esta identidad **sobrevive a `restoreElements`** (el core conserva `customData`;
 ### 5.4 Qué ocurre en cada caso
 
 | Acción | Comportamiento |
-|---|---|
+| --- | --- |
 | **Mover representación** | Se mueve el grupo (image+text) normalmente (operación normal de Excalidraw). La identidad no cambia; la posición se relee del primary. |
 | **Duplicar** | El core duplicaría el grupo con el MISMO `customData` → segunda representación del MISMO folder (incoherencia). Por eso **se intercepta duplicate/copy** de folder (ver §10): genera un folder/board NUEVO con ids nuevos y `reprId` nuevo. En v1 el atajo de duplicar un folder se redirige a "duplicar folder/board". |
 | **Borrar (Delete)** | Interceptación vía `onChange` + reconcilador de huérfanos: si el `primary` de una folder deja de existir (isDeleted) → se dispara `deleteFolder` de dominio (§9). Ver nota en §6. |
@@ -485,6 +498,7 @@ A (raíz, protegida)
 ### 9.2 Cómo se localizan las representaciones
 
 `findVisualRepresentations(graph, deletedFolderIds)`:
+
 - Para cada board del grafo, leer `excalidraw-board-<id>` (o el índice en memoria) y filtrar elementos con `customData.folderBoard` cuyo target (folderId o pointerId/targetFolderId) esté en `deletedFolderIds`. Esto cubre representaciones de folders (en board del padre) y de pointers (en cualquier board).
 
 ### 9.3 Eliminar boards
@@ -502,7 +516,7 @@ Todo se aplica en UNA transacción del repositorio: si algo falla a mitad, se re
 ### 10.1 Semántica según selección en Ctrl+C
 
 | Selección | Vía | Qué se serializa |
-|---|---|---|
+| --- | --- | --- |
 | Solo elementos de Excalidraw (sin folder/pointer) | **Clipboard del core** (sin cambios) | `EXPORT_DATA_TYPES.excalidrawClipboard` |
 | **Folder** (primary o texto de una representación, o el grupo completo) | **Board clipboard** (host) | Payload `application/x-excalidraw-board` |
 | **FolderPointer** | **Board clipboard** (host) | Payload pointer |
@@ -518,7 +532,7 @@ Detección: host lee `appState.selectedElementIds`, intersecta con elementos que
 ### 10.3 Reglas de IDs y remapeo (importante)
 
 | Ítem | Regla |
-|---|---|
+| --- | --- |
 | **IDs nuevos** | `FolderId`, `BoardId`, `FolderPointerId` de las piezas copiadas → **todos nuevos** al pegar. Un folder copiado y pegado N veces genera N folders/boards distintos, sin colisión. |
 | **IDs conservados** | `targetFolderId` de un **FolderPointer** se conserva tal cual (el pointer sigue apuntando a la folder original). |
 | Remapeo `parentId` | Los folders **internamente** copiados se re-padrean dentro del clon según su jerarquía original; la **raíz del clon** se re-padrea a `currentFolderId` (donde se pega) — o se mantiene la referencia externa si el clon no incluye a su padre (ver referencias externas). |
@@ -547,12 +561,13 @@ Detección: host lee `appState.selectedElementIds`, intersecta con elementos que
 **DECISIÓN EXPLÍCITA**:
 
 | Capa | Pertenece a | Política v1 |
-|---|---|---|
+| --- | --- | --- |
 | Dibujo/movimiento/edición de elementos dentro de un board | history de Excalidraw | **Sin cambios** (undo/redo normal funciona). |
 | Representación visual de folders/pointers (imagen/texto) creadas/eliminadas por el Board System | del Board System | Se inyectan con `captureUpdate: NEVER` / mediante `updateScene` que **no** entra en el history del core para la creación; el movimiento posterior del grupo es editable normal pero las notas abajo. |
 | Operaciones del árbol (create/move/rename/delete/copy de folders/pointers/boards) | **Board history** (propio) | **v1: NO se implementa undo/redo del árbol** si añade demasiada complejidad. |
 
 **Consecuencias documentadas (aceptadas para v1):**
+
 1. Ctrl+Z inmediatamente tras "crear folder" **no deshace la creación** (la entidad + su board persisten); solo desharía la edición de elementos posterior si se hubiera capturado.
 2. "Borrar folder" es inmediato y **no** deshacible con Ctrl+Z (hay diálogo de confirmación).
 3. El flujo de elementos (dibujo) SÍ sigue el undo/redo normal, y no se rompe.
@@ -565,7 +580,7 @@ No se toca `history.ts` ni `actionHistory.tsx` (prohibido).
 ## 12. Seguridad contra regresiones
 
 | Funcionalidad | Qué parte del nuevo sistema podría afectarla | Cómo evitamos la regresión |
-|---|---|---|
+| --- | --- | --- |
 | **drawing** | Custom tools / `onPointerDown` interceptados | El folder tool actúa solo con `customType === "folder"/"folderPointer"`; resto del flujo intacto. |
 | **selection** | `updateScene` con `selectedElementIds`; grupos de folder | Selección nativa de grupos intacta; el reconcilador solo toca `customData.folderBoard`. |
 | **text** | Retroceso por dblclick | El listener nativo no consume eventos que no tengan `customData.folderBoard`; dblclick sobre texto normal sigue al core. |
@@ -623,6 +638,7 @@ excalidraw-app/boards/
 ```
 
 **Dependencias por archivo (resumen):**
+
 - `domain/*` y `types.ts`: solo tipos + `@excalidraw/common` (ids). **Prohibido**: React, `@excalidraw/excalidraw`, `localStorage`, DOM.
 - `repository/*`: `types` + `app_constants` + `idb-keyval`. **Prohibido**: core, React.
 - `host/*`, `clipboard/*`, `navigation/*`: `domain` + `repository` + `@excalidraw/excalidraw` (API/export) + `@excalidraw/element` + jotai. **Prohibido**: `localStorage` directo.
@@ -639,6 +655,7 @@ excalidraw-app/boards/
 > Invariantes de TODA fase: no romper funcionalidades existentes; no tocar archivos prohibidos de la §17; cerrar con tests + typecheck + lint verdes.
 
 ### FASE 0 — Dominio + tests unitarios
+
 - **Objetivo:** modelo puro completo y testeado.
 - **Archivos permitidos:** `excalidraw-app/boards/types.ts`, `domain/ids.ts`, `domain/graph.ts`, `domain/pointers.ts`, `domain/board.ts`, `domain/delete.ts`, `domain/copySubtree.ts` y sus tests (`__tests__/`).
 - **Archivos prohibidos:** todo el core, `App.tsx`, `repository/*` (aún no crear), `host/*`, `ui/*`.
@@ -650,6 +667,7 @@ excalidraw-app/boards/
 - **Rollback:** borrar `boards/domain` (sin tocar nada del repo existente).
 
 ### FASE 1 — Persistencia local + schemaVersion
+
 - **Objetivo:** `BoardRepository` + `LocalStorageBoardRepository`; roundtrip grafo/boards; migración v1.
 - **Archivos permitidos:** `repository/BoardRepository.ts`, `repository/LocalStorageBoardRepository.ts`, `app_constants.ts` (claves), tests.
 - **Archivos prohibidos:** core, `App.tsx`, `host/*`, `ui/*`.
@@ -661,6 +679,7 @@ excalidraw-app/boards/
 - **Rollback:** eliminar `repository/*` y las claves nuevas.
 
 ### FASE 2 — Integración mínima (composition root + boot)
+
 - **Objetivo:** arranque con raíz; `currentBoardId`; migración del `excalidraw` legacy a board raíz; estado jotai.
 - **Archivos permitidos:** `App.tsx` (solo glue), `host/boardState.ts`, `host/boardService.ts` (bootstrap/open/save stubs), `app-jotai.ts`.
 - **Archivos prohibidos:** core; `domain` (leer, no cambiar); `ui` aún.
@@ -672,6 +691,7 @@ excalidraw-app/boards/
 - **Rollback:** revertir glue en `App.tsx`.
 
 ### FASE 3 — Creación de Folder (custom tool)
+
 - **Objetivo:** botón + click → create folder + representación visual.
 - **Archivos permitidos:** `host/materialize.ts`, `host/folderService.ts` (create), `ui/ToolButtons.tsx`, `App.tsx` (registrar `onPointerDown/Up`), tests de integración.
 - **Archivos prohibidos:** core; `navigation`; clipboard.
@@ -683,6 +703,7 @@ excalidraw-app/boards/
 - **Rollback:** desactivar botón (sin borrar service).
 
 ### FASE 4 — Apertura (dblclick + save/open board)
+
 - **Objetivo:** abrir folder guardando el board previo.
 - **Archivos permitidos:** `host/hitTest.ts`, `host/boardService.ts` (open/save), `App.tsx` (listener dblclick), tests de integración.
 - **Archivos prohibidos:** core (NECESARIO NO TOCAR — resuelto en §6.2).
@@ -694,6 +715,7 @@ excalidraw-app/boards/
 - **Rollback:** retirar listener.
 
 ### FASE 5 — Navegación (breadcrumb + back/forward)
+
 - **Objetivo:** `NavigationHistory`, back/forward, breadcrumb derivado de árbol.
 - **Archivos permitidos:** `navigation/navigation.ts`, `host/boardState.ts` (ampliar), `ui/NavBar.tsx`, `App.tsx` (montar NavBar), tests.
 - **Archivos prohibidos:** core; clipboard; delete.
@@ -705,6 +727,7 @@ excalidraw-app/boards/
 - **Rollback:** ocultar NavBar.
 
 ### FASE 6 — FolderPointer
+
 - **Objetivo:** crear pointer + resolver target.
 - **Archivos permitidos:** `host/pointerService.ts`, `ui/PickerFolderDialog.tsx`, `host/materialize.ts` (pointer), `App.tsx`, tests.
 - **Archivos prohibidos:** core; delete aún.
@@ -716,6 +739,7 @@ excalidraw-app/boards/
 - **Rollback:** desactivar tool.
 
 ### FASE 7 — Delete (transaccional)
+
 - **Objetivo:** eliminar subárbol + boards + pointers + representaciones; raíz protegida.
 - **Archivos permitidos:** `host/folderService.ts` (delete), `host/reconcile.ts` (huérfanos via onChange), `repository` (applyTransaction), `ui/FolderContextMenu.tsx`, tests.
 - **Archivos prohibidos:** core; clipboard aún.
@@ -727,6 +751,7 @@ excalidraw-app/boards/
 - **Rollback:** ocultar menú delete.
 
 ### FASE 8 — Copy/Paste (Board clipboard)
+
 - **Objetivo:** board clipboard; copiar/pegar Folder y Pointer; remapeo; selección mixta.
 - **Archivos permitidos:** `clipboard/boardClipboard.ts`, `host/folderService.ts` (paste), `App.tsx` (listeners copy/paste + `onPaste`), tests.
 - **Archivos prohibidos:** core (clipboard del core intacto — §10.5).
@@ -738,6 +763,7 @@ excalidraw-app/boards/
 - **Rollback:** desactivar interceptor (vuelve clipboard nativo).
 
 ### FASE 9 — Edición visual (rename, icon, coherencia)
+
 - **Objetivo:** renombrar, cambiar icono, re-agrupar representaciones.
 - **Archivos permitidos:** `host/folderService.ts` (rename/setIcon), `host/materialize.ts` (re-materializar), `host/reconcile.ts` (re-group), `ui/FolderContextMenu.tsx`, `ui/RenameDialog.tsx`, tests.
 - **Archivos prohibidos:** core; clipboard; delete (ya establecidos).
@@ -749,6 +775,7 @@ excalidraw-app/boards/
 - **Rollback:** solo UI.
 
 ### FASE 10 — Hardening (multi-tab, corrupción, GC, robustez)
+
 - **Objetivo:** resiliencia ante anomalías de almacenamiento y múltiples pestañas.
 - **Archivos permitidos:** `repository/LocalStorageBoardRepository.ts` (versión/tabSync, GC de iconos), `host/reconcile.ts`, tests.
 - **Archivos prohibidos:** core; `LocalData.ts` intacto.
@@ -760,6 +787,7 @@ excalidraw-app/boards/
 - **Rollback:** revertir solo mejoras de hardening (aisladas).
 
 ### FASE 11 — Regresión integral + cierre
+
 - **Objetivo:** validación total y final del sistema completo.
 - **Archivos permitidos:** solo tests; corrección OPCIONAL y acotada de bugs en `boards/`.
 - **Archivos prohibidos:** todo el core y `LocalData.ts`.
@@ -783,20 +811,20 @@ apertura → navegación → pointers → delete → clipboard → edición visu
 
 Equivalencias con las 12 fases:
 
-| Orden priorizado | Fase |
-|---|---|
-| dominio + tests | 0 |
-| persistencia | 1 |
-| integración mínima | 2 |
-| creación de Folder | 3 |
-| apertura | 4 |
-| navegación | 5 |
-| pointers | 6 |
-| delete | 7 |
-| clipboard | 8 |
-| edición visual | 9 |
-| hardening | 10 |
-| regresión integral | 11 |
+| Orden priorizado   | Fase |
+| ------------------ | ---- |
+| dominio + tests    | 0    |
+| persistencia       | 1    |
+| integración mínima | 2    |
+| creación de Folder | 3    |
+| apertura           | 4    |
+| navegación         | 5    |
+| pointers           | 6    |
+| delete             | 7    |
+| clipboard          | 8    |
+| edición visual     | 9    |
+| hardening          | 10   |
+| regresión integral | 11   |
 
 **Justificación:** (a) el dominio debe ser la primera piedra porque la persistencia, la creación y el copy dependen de sus invariantes; (b) tests acompañan al dominio (no después) para congelar el modelo antes de construir encima; (c) la persistencia va antes de la integración porque la integración/boot necesita el repo; (d) creación antes que apertura (no se puede abrir algo que no se crea); (e) navegación antes que pointers (el picker reusa el árbol); (f) delete después de pointers (delete debe limpiarlos); (g) clipboard después de delete (reusa clone/remap y el estado final del subárbol); (h) edición visual y hardening al final por ser refinamiento/robustez, no núcleo. No agrego funcionalidades nuevas solo para llenar 12: los 12 hitos salen de dividir el alcance declarado.
 
@@ -829,6 +857,7 @@ NO se adelanta a la siguiente fase. NO se hacen refactors no relacionados. NO se
 ## 17. Regla especial para el core de Excalidraw
 
 **PROHIBIDO modificar por defecto:**
+
 ```
 packages/excalidraw/components/App.tsx
 packages/excalidraw/clipboard.ts
@@ -838,6 +867,7 @@ packages/element/src/newElement.ts
 packages/excalidraw/data/restore.ts
 packages/excalidraw/data/transform.ts
 ```
+
 También quedan protegidos (por seguridad adicional): `packages/element/src/collision.ts`, `packages/excalidraw/history.ts`, `packages/excalidraw/actions/actionHistory.tsx`, `excalidraw-app/data/LocalData.ts`, `excalidraw-app/data/firebase.ts` y `excalidraw-app/collab/**`.
 
 Solo se podrán modificar si se demuestra que **no existe solución razonable desde `excalidraw-app`**. En ese caso: **DETENERSE**, explicar por qué, mostrar qué API existente no es suficiente, proponer el cambio mínimo, y **no implementarlo hasta aprobación del usuario**.
