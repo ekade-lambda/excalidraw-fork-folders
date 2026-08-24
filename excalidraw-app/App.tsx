@@ -532,7 +532,7 @@ const ExcalidrawWrapper = () => {
             repo: new LocalStorageBoardRepository(),
             excalidrawAPI,
             parentFolderId,
-            name: "Carpeta",
+            name: `Carpeta ${Math.floor(Math.random() * 1000)}`,
             sceneX,
             sceneY,
           }).catch((error) => {
