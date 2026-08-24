@@ -8,7 +8,10 @@ import {
   pointerReusesTargetId,
   resolvePointer,
 } from "../../boards/domain/pointers";
-import { deleteFolder } from "../../boards/domain/delete";
+import {
+  prepareDeleteFolderPatch,
+  applyDeletePatch,
+} from "../../boards/domain/delete";
 import { newFolderPointerId } from "../../boards/domain/ids";
 import { createRootGraph } from "../../boards/domain/graph";
 
@@ -67,12 +70,13 @@ describe("Board System :: FolderPointer", () => {
       throw new Error("no creado");
     }
     const pointerId = created.pointer.id;
-    const afterDelete = deleteFolder(created.graph, bId);
-    expect(afterDelete.ok).toBe(true);
-    if (afterDelete.ok) {
+    const patchRes = prepareDeleteFolderPatch(created.graph, bId);
+    expect(patchRes.ok).toBe(true);
+    if (patchRes.ok) {
+      const afterDeleteGraph = applyDeletePatch(created.graph, patchRes.patch);
       // El delete automático también elimina el pointer (sin colgantes).
-      expect(afterDelete.graph.pointers[pointerId]).toBeUndefined();
-      expect(resolvePointer(afterDelete.graph, pointerId)).toBeUndefined();
+      expect(afterDeleteGraph.pointers[pointerId]).toBeUndefined();
+      expect(resolvePointer(afterDeleteGraph, pointerId)).toBeUndefined();
     }
   });
 
