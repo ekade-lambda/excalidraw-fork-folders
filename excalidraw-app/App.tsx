@@ -154,6 +154,8 @@ import { LocalStorageBoardRepository } from "./boards/repository/LocalStorageBoa
 import { FolderToolButton } from "./boards/ui/ToolButtons";
 import { createFolder } from "./boards/host/folderService";
 import { boardsStoreActions } from "./boards/host/boardState";
+import { openFolder } from "./boards/host/boardService";
+import { hitTestFolderAtPoint } from "./boards/host/hitTest";
 
 import type { CollabAPI } from "./collab/Collab";
 
@@ -524,6 +526,31 @@ const ExcalidrawWrapper = () => {
     );
     return unsubscribe;
   }, [excalidrawAPI]);
+
+  // Board System — doble clic (Fase 4): si el punto cae sobre la representación
+  // de una Folder, abre su Board. Función glue; se enlaza onDoubleClick en el
+  // div contenedor (el dblclick del canvas burbujea hasta él), sin tocar core.
+  const handleCanvasDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!excalidrawAPI) {
+      return;
+    }
+    const { x, y } = viewportCoordsToSceneCoords(
+      { clientX: event.clientX, clientY: event.clientY },
+      excalidrawAPI.getAppState(),
+    );
+    const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
+    const hit = hitTestFolderAtPoint(elements, { x, y });
+    if (hit.kind !== "folder") {
+      return; // elemento normal → el editor conserva su comportamiento.
+    }
+    void openFolder({
+      repo: new LocalStorageBoardRepository(),
+      excalidrawAPI,
+      folderId: hit.folderId,
+    }).catch((error) => {
+      console.error("BoardSystem: open folder failed", error);
+    });
+  };
   // ---------------------------------------------------------------------------
   // Hoisted loadImages
   // ---------------------------------------------------------------------------
@@ -996,6 +1023,7 @@ const ExcalidrawWrapper = () => {
       className={clsx("excalidraw-app", {
         "is-collaborating": isCollaborating,
       })}
+      onDoubleClick={handleCanvasDoubleClick}
     >
       <Excalidraw
         viewportStatusFrame={viewportStatusFrame}

@@ -12,7 +12,7 @@
  *   - No se construye UI ni navegación (Fases posteriores).
  */
 
-import { CaptureUpdateAction } from "@excalidraw/excalidraw";
+import { CaptureUpdateAction, getCommonBounds } from "@excalidraw/excalidraw";
 
 import { restoreElements } from "@excalidraw/excalidraw/data/restore";
 
@@ -162,15 +162,16 @@ export async function initializeBoardSystem(
   };
 }
 
-/** Integración mínima: vuelca un BoardData a la escena del editor. */
+/** Carga un board en el editor: actualiza escena, files y viewport (Fase 4). */
 export function loadBoardIntoEditor(
   excalidrawAPI: ExcalidrawImperativeAPI,
   boardData: BoardData,
 ): void {
+  const restored = restoreElements(boardData.elements, null, {
+    repairBindings: true,
+  });
   excalidrawAPI.updateScene({
-    elements: restoreElements(boardData.elements, null, {
-      repairBindings: true,
-    }),
+    elements: restored,
     appState: { isLoading: false },
     captureUpdate: CaptureUpdateAction.NEVER,
   });
@@ -178,6 +179,15 @@ export function loadBoardIntoEditor(
   const files = Object.values(boardData.files);
   if (files.length) {
     excalidrawAPI.addFiles(files);
+  }
+
+  // Restaura el viewport encuadrando el contenido del board. `setViewport` del
+  // API NO acepta coords sueltas (scrollX/Y/zoom), por lo que usamos el
+  // mecanismo público: encuadrar al contenido (getCommonBounds → target).
+  const visible = restored.filter((el) => !el.isDeleted);
+  if (visible.length) {
+    const bounds = getCommonBounds(visible) as [number, number, number, number];
+    excalidrawAPI.setViewport({ target: bounds, fit: "contain" });
   }
 }
 
@@ -198,4 +208,63 @@ export async function saveCurrentBoard(
     updatedAt: Date.now(),
   };
   await repo.saveBoard(data);
+}
+
+/**
+ * Abre una Folder (dobl-click en su representación): guarda el board actual,
+ * valida que la folder siga existiendo en el grafo, resuelve su boardId 1:1,
+ * carga el contenido al editor, restaura viewport y actualiza el estado.
+ * NO crea folder/board nuevos y NO corrompe el grafo.
+ */
+export async function openFolder(opts: {
+  repo: BoardRepository;
+  excalidrawAPI: ExcalidrawImperativeAPI;
+  folderId: FolderId;
+}): Promise<{ ok: boolean; reason?: string }> {
+  const { repo, excalidrawAPI, folderId } = opts;
+
+  // 1. Persistir el board actual (la escena que está en el editor).
+  const currentBoardId = boardsStoreActions.getCurrentBoardId();
+  if (currentBoardId) {
+    await saveCurrentBoard(excalidrawAPI, repo, currentBoardId);
+  }
+
+  // 2. Validar que la Folder siga existiendo y no sea la raíz "hija" (la raíz
+  //    no puede abrirse como si fuera una carpeta a través de esta vía).
+  const graph = await repo.load();
+  if (!graph) {
+    return { ok: false, reason: "no-graph" };
+  }
+  const folder = graph.folders[folderId];
+  if (!folder) {
+    return { ok: false, reason: "folder-not-found" };
+  }
+
+  // 3. Resolver Folder → Board (1:1).
+  const boardId = folder.boardId;
+  const board = graph.boards[boardId];
+  if (!board || board.rootFolderId !== folder.id) {
+    return { ok: false, reason: "board-not-found" };
+  }
+
+  // 4. Cargar BoardData (si falta, no romper: vacío).
+  let boardData = await repo.loadBoard(boardId);
+  if (!boardData) {
+    boardData = buildBoardData(boardId, folder.name, []);
+  }
+
+  // 5. Vuelcar al editor (escena + files + viewport).
+  loadBoardIntoEditor(excalidrawAPI, boardData);
+
+  // 6. Actualizar estado del Board System.
+  boardsStoreActions.setCurrentBoardId(boardId);
+  boardsStoreActions.setCurrentFolderId(folderId);
+  boardsStoreActions.setBoardData(boardData);
+  boardsStoreActions.setReady(true);
+
+  // 7. Persistir lastOpenBoardId para restaurar en el próximo boot.
+  graph.lastOpenBoardId = boardId;
+  await repo.save(graph);
+
+  return { ok: true };
 }
