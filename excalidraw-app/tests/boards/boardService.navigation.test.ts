@@ -19,7 +19,7 @@ function mockApi() {
   const api = {
     updateScene: vi.fn(),
     addFiles: vi.fn(),
-    getAppState: vi.fn(() => ({})),
+    getAppState: vi.fn(() => ({ width: 800, height: 600 })),
     getSceneElementsIncludingDeleted: vi.fn(() => []),
     getFiles: vi.fn(() => ({})),
     getName: vi.fn(() => "root"),
@@ -261,6 +261,29 @@ describe("Board System :: navigation integration (Fase 5)", () => {
     expect(boardsStoreActions.getCurrentFolderId()).toBe(graph.rootFolderId);
     expect(boardsStoreActions.getCurrentBoardId()).toBe(
       graph.folders[graph.rootFolderId].boardId,
+    );
+  });
+
+  it("al abrir un Board el viewport se resetea a 100% y centro en (0,0)", async () => {
+    const repo = makeRepo();
+    const { bFolderId } = await seedGraphWithBC(repo);
+    const api = mockApi();
+
+    await initializeBoardSystem(repo);
+
+    // clear any calls from initializeBoardSystem (if it calls updateScene)
+    vi.mocked(api.updateScene).mockClear();
+
+    await openFolder({ repo, excalidrawAPI: api, folderId: bFolderId });
+
+    expect(api.updateScene).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appState: expect.objectContaining({
+          zoom: { value: 1 },
+          scrollX: 400, // 800 / 2
+          scrollY: 300, // 600 / 2
+        }),
+      }),
     );
   });
 });

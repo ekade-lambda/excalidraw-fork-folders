@@ -12,7 +12,7 @@
  *   - No se construye UI ni navegación (Fases posteriores).
  */
 
-import { CaptureUpdateAction, getCommonBounds } from "@excalidraw/excalidraw";
+import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 
 import { restoreElements } from "@excalidraw/excalidraw/data/restore";
 
@@ -20,7 +20,7 @@ import type { ExcalidrawElement } from "@excalidraw/element/types";
 
 import type { BinaryFiles } from "@excalidraw/excalidraw/types";
 
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import type { ExcalidrawImperativeAPI, NormalizedZoomValue } from "@excalidraw/excalidraw/types";
 
 import { createRootGraph } from "../domain/graph";
 import { STORAGE_KEYS } from "../../app_constants";
@@ -189,24 +189,21 @@ export function loadBoardIntoEditor(
   const restored = restoreElements(boardData.elements, null, {
     repairBindings: true,
   });
+  const editorState = excalidrawAPI.getAppState();
   excalidrawAPI.updateScene({
     elements: restored,
-    appState: { isLoading: false },
+    appState: { 
+      isLoading: false,
+      zoom: { value: 1 as NormalizedZoomValue },
+      scrollX: editorState.width / 2,
+      scrollY: editorState.height / 2,
+    },
     captureUpdate: CaptureUpdateAction.NEVER,
   });
 
   const files = Object.values(boardData.files);
   if (files.length) {
     excalidrawAPI.addFiles(files);
-  }
-
-  // Restaura el viewport encuadrando el contenido del board. `setViewport` del
-  // API NO acepta coords sueltas (scrollX/Y/zoom), por lo que usamos el
-  // mecanismo público: encuadrar al contenido (getCommonBounds → target).
-  const visible = restored.filter((el) => !el.isDeleted);
-  if (visible.length) {
-    const bounds = getCommonBounds(visible) as [number, number, number, number];
-    excalidrawAPI.setViewport({ target: bounds, fit: "contain" });
   }
 }
 

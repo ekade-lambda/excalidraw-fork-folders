@@ -104,8 +104,6 @@ describe("Board System :: openFolder (Fase 4)", () => {
 
     // Se cargó la escena.
     expect(api.updateScene).toHaveBeenCalled();
-    // Se restauró el viewport (o al menos se llamó setViewport si hay contenido).
-    expect(api.setViewport).toHaveBeenCalled();
 
     // El grafo NO se corrompe ni crea folder/board nuevos.
     const graph = await repo.load();

@@ -399,7 +399,7 @@ const ExcalidrawWrapper = () => {
   const initialStatePromiseRef = useRef<{
     promise: ResolvablePromise<ExcalidrawInitialDataState | null>;
   }>({ promise: null! });
-  
+
   const boardRepo = useMemo(() => new LocalStorageBoardRepository(), []);
   if (!initialStatePromiseRef.current.promise) {
     initialStatePromiseRef.current.promise =
@@ -1080,10 +1080,17 @@ const ExcalidrawWrapper = () => {
             return null;
           }
           return (
-            <>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                order: 1,
+              }}
+            >
               <FolderToolButton excalidrawAPI={excalidrawAPI} />
               <NavBar repo={boardRepo} excalidrawAPI={excalidrawAPI} />
-            </>
+            </div>
           );
         }}
         renderTopRightUI={(isMobile) => {
