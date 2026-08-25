@@ -1,3 +1,10 @@
+import {
+  createStore,
+  get as idbGet,
+  set as idbSet,
+  del as idbDel,
+} from "idb-keyval";
+
 import { createRootGraph } from "../domain/graph";
 import { STORAGE_KEYS } from "../../app_constants";
 
@@ -30,6 +37,18 @@ export function createEmptyBoardData(boardId: BoardId, name = ""): BoardData {
     name,
     updatedAt: now(),
   };
+}
+
+const boardsIdbStore = createStore("excalidraw-boards", "boards-store");
+
+function isQuotaExceededError(err: any): boolean {
+  return (
+    err?.name === "QuotaExceededError" ||
+    err?.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+    (err instanceof DOMException &&
+      (err.name === "QuotaExceededError" ||
+        err.name === "NS_ERROR_DOM_QUOTA_REACHED"))
+  );
 }
 
 function safeGet(key: string): string | null {
@@ -179,7 +198,12 @@ export class LocalStorageBoardRepository implements BoardRepository {
       return null;
     }
 
-    const parsed = parseJsonObject<BoardData>(raw);
+    const parsed = parseJsonObject<any>(raw);
+    if (parsed && parsed.__idb_pointer) {
+      // Cannot load IDB payload synchronously. Returning null to avoid destruction.
+      return null;
+    }
+
     if (!parsed || !shapeIsBoardData(parsed)) {
       // Board payload corrupto -> reconstruir vacío (no romper el grafo).
       console.warn(
@@ -206,7 +230,50 @@ export class LocalStorageBoardRepository implements BoardRepository {
   }
 
   async loadBoard(boardId: BoardId): Promise<BoardData | null> {
-    return this.loadBoardSync(boardId);
+    const key = boardKey(boardId);
+    const raw = safeGet(key);
+    if (raw == null) {
+      return null;
+    }
+
+    let parsed = parseJsonObject<any>(raw);
+
+    // Si es un puntero, intentamos recuperar de IndexedDB
+    if (parsed && parsed.__idb_pointer) {
+      const idbRaw = await idbGet<string>(key, boardsIdbStore);
+      if (!idbRaw) {
+        // Puntero huérfano (payload no existe en IDB)
+        console.warn(
+          `BoardRepository: IDB payload missing for pointer ${key}.`,
+        );
+        return null; // Devolver null es más seguro, la capa superior puede decidir recrearlo.
+      }
+      parsed = parseJsonObject<any>(idbRaw);
+    }
+
+    // Validar el payload final (sea de LS o IDB)
+    if (!parsed || !shapeIsBoardData(parsed)) {
+      console.warn(
+        `BoardRepository: BoardData corrupto para ${boardId}. Se reconstruye vacío.`,
+      );
+      const empty = createEmptyBoardData(boardId);
+      safeSet(key, JSON.stringify(empty));
+      return empty;
+    }
+
+    let data = parsed as BoardData;
+    let version = parsed.schemaVersion;
+    while (version < this.schemaVersion) {
+      const mig = this.boardMigrations[version];
+      if (!mig) {
+        break;
+      }
+      data = mig(data);
+      version += 1;
+    }
+    return version === this.schemaVersion
+      ? { ...data, schemaVersion: this.schemaVersion }
+      : data;
   }
 
   saveBoardSync(boardData: BoardData): void {
@@ -217,11 +284,42 @@ export class LocalStorageBoardRepository implements BoardRepository {
   }
 
   async saveBoard(boardData: BoardData): Promise<void> {
-    return this.saveBoardSync(boardData);
+    const key = boardKey(boardData.boardId);
+    const value = JSON.stringify({
+      ...boardData,
+      schemaVersion: this.schemaVersion,
+    });
+
+    try {
+      window.localStorage.setItem(key, value);
+
+      // Cleanup IDB in background si exitoso, para no desperdiciar espacio
+      idbDel(key, boardsIdbStore).catch(() => {});
+    } catch (error: any) {
+      if (isQuotaExceededError(error)) {
+        console.warn(
+          `BoardRepository: Quota exceeded for ${key}. Falling back to IndexedDB.`,
+        );
+
+        // 1. Intentar escribir payload completo en IndexedDB (si falla, propaga)
+        await idbSet(key, value, boardsIdbStore);
+
+        // 2. Escribir puntero a LocalStorage. Si esto falla (cuota 100%), propaga.
+        // El payload quedó en IDB, lo cual es inofensivo.
+        window.localStorage.setItem(
+          key,
+          JSON.stringify({ __idb_pointer: true }),
+        );
+      } else {
+        throw error; // Propagar otros errores normalmente
+      }
+    }
   }
 
   async deleteBoard(boardId: BoardId): Promise<void> {
-    safeRemove(boardKey(boardId));
+    const key = boardKey(boardId);
+    safeRemove(key);
+    await idbDel(key, boardsIdbStore).catch(() => {});
   }
 
   // ------------------------------------------------------------------
