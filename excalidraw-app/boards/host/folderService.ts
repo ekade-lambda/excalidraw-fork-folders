@@ -120,6 +120,7 @@ export async function createFolder(opts: {
     elements: nextElements,
     captureUpdate: CaptureUpdateAction.IMMEDIATELY,
   });
+
   excalidrawAPI.addFiles([imageFile]);
 
   return { ok: true, folderId, boardId };

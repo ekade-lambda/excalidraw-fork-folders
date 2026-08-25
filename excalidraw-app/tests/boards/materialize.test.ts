@@ -4,6 +4,7 @@ import {
   buildFolderImageDataUrl,
   buildFolderVisual,
   findFolderVisual,
+  utf8ToBase64,
 } from "../../boards/host/materialize";
 
 import type { BoardId, FolderId } from "../../boards/types";
@@ -65,14 +66,36 @@ describe("Board System :: materialize (Fase 3)", () => {
     expect(visual.text.y).toBe(60 + visual.primary.height + 8);
   });
 
-  it("buildFolderImageDataUrl genera un dataURL SVG usable", () => {
+  it("buildFolderImageDataUrl genera un dataURL SVG base64 compatible con Core", () => {
     const url = buildFolderImageDataUrl();
-    expect(url.startsWith("data:image/svg+xml")).toBe(true);
-    // El body está URL-encoded; al decodificarlo contiene <svg.
-    const decoded = decodeURIComponent(
-      url.replace(/^data:image\/svg\+xml;charset=utf-8,?/i, ""),
-    );
+    expect(url.startsWith("data:image/svg+xml;base64,")).toBe(true);
+
+    const base64 = url.slice(url.indexOf(",") + 1);
+    const byteString = window.atob(base64);
+
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    const decoded = new TextDecoder("utf-8").decode(ab);
+
     expect(decoded).toContain("<svg");
+  });
+
+  it("utf8ToBase64 y atob (Core) pueden hacer round-trip seguro con Unicode (acentos, emojis)", () => {
+    const originalSvg = `<svg>ñáéíóú 📁 ✨</svg>`;
+    const base64 = utf8ToBase64(originalSvg);
+
+    const byteString = window.atob(base64);
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    const recoveredSvg = new TextDecoder("utf-8").decode(ab);
+
+    expect(recoveredSvg).toBe(originalSvg);
   });
 
   it("los ids de archivo y repr son únicos y con prefijo", () => {

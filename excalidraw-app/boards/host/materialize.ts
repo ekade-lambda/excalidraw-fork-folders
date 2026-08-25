@@ -53,6 +53,20 @@ const LABEL_GAP = 8;
 const LABEL_FONT_SIZE = 16;
 
 /** dataURL SVG de una carpeta por defecto (icono). */
+
+/**
+ * Convierte un string (que puede contener UTF-8) a Base64
+ * compatible con la decodificación estricta del Core de Excalidraw.
+ */
+export function utf8ToBase64(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  let bstring = "";
+  for (const byte of bytes) {
+    bstring += String.fromCharCode(byte);
+  }
+  return btoa(bstring);
+}
+
 export function buildFolderImageDataUrl(): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90" viewBox="0 0 120 90" fill="none">
   <rect x="4" y="20" width="112" height="66" rx="6" fill="#f1c15d" stroke="#b8860b" stroke-width="3"/>
@@ -60,7 +74,7 @@ export function buildFolderImageDataUrl(): string {
   <rect x="10" y="26" width="30" height="12" rx="3" fill="#f7d794"/>
   <rect x="48" y="26" width="30" height="12" rx="3" fill="#f7d794"/>
 </svg>`;
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  return `data:image/svg+xml;base64,${utf8ToBase64(svg)}`;
 }
 
 /** Genera un FileId con alta entropía para la imagen de la carpeta. */

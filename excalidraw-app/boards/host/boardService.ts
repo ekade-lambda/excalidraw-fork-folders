@@ -12,6 +12,7 @@
  *   - No se construye UI ni navegación (Fases posteriores).
  */
 
+import { utf8ToBase64 } from "./materialize";
 import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 
 import { restoreElements } from "@excalidraw/excalidraw/data/restore";
@@ -206,7 +207,28 @@ export function loadBoardIntoEditor(
 
   const files = Object.values(boardData.files);
   if (files.length) {
-    excalidrawAPI.addFiles(files);
+    const normalizedFiles = files.map((f) => {
+      if (
+        f.mimeType === "image/svg+xml" &&
+        f.dataURL.startsWith("data:image/svg+xml;charset=utf-8,")
+      ) {
+        const payload = f.dataURL.slice(f.dataURL.indexOf(",") + 1);
+        if (/%/.test(payload)) {
+          try {
+            const decodedSvg = decodeURIComponent(payload);
+            const base64DataUrl = `data:image/svg+xml;base64,${utf8ToBase64(
+              decodedSvg,
+            )}`;
+            return { ...f, dataURL: base64DataUrl as any };
+          } catch (e) {
+            return f;
+          }
+        }
+      }
+      return f;
+    });
+
+    excalidrawAPI.addFiles(normalizedFiles);
   }
 }
 
