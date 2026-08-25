@@ -569,7 +569,9 @@ const ExcalidrawWrapper = () => {
   } | null>(null);
 
   const handleHostContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!excalidrawAPI) return;
+    if (!excalidrawAPI) {
+      return;
+    }
     const { clientX, clientY } = event;
     const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
       { clientX, clientY },
@@ -579,7 +581,7 @@ const ExcalidrawWrapper = () => {
     const hit = hitTestFolderAtPoint(elements, { x: sceneX, y: sceneY });
 
     if (hit.kind !== "none") {
-      let fId = hit.kind === "folder" ? hit.folderId : hit.targetFolderId;
+      const fId = hit.kind === "folder" ? hit.folderId : hit.targetFolderId;
       let initialName = "";
       for (const el of elements) {
         const m = el.customData?.folderBoard;
@@ -593,12 +595,11 @@ const ExcalidrawWrapper = () => {
         }
       }
 
-      // It's a folder or pointer, intercept native context menu
-      event.preventDefault();
-      event.stopPropagation();
+      // It's a folder or pointer, but DO NOT intercept native menu to preserve it
+
       setRenameCtx({
         folderId: fId,
-        initialName: initialName,
+        initialName,
         x: clientX,
         y: clientY,
       });
@@ -1160,6 +1161,7 @@ const ExcalidrawWrapper = () => {
         "is-collaborating": isCollaborating,
       })}
       onDoubleClick={handleCanvasDoubleClick}
+      onContextMenu={handleHostContextMenu}
     >
       <Excalidraw
         viewportStatusFrame={viewportStatusFrame}
@@ -1545,6 +1547,7 @@ const ExcalidrawWrapper = () => {
               background: "white",
               padding: "4px",
               boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+              transform: "translate(0, -110%)",
               borderRadius: "4px",
               display: "flex",
               flexDirection: "column",
@@ -1555,9 +1558,12 @@ const ExcalidrawWrapper = () => {
                 autoFocus
                 defaultValue={renameCtx.initialName}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter")
+                  if (e.key === "Enter") {
                     handleRenameConfirm(e.currentTarget.value);
-                  if (e.key === "Escape") setRenameCtx(null);
+                  }
+                  if (e.key === "Escape") {
+                    setRenameCtx(null);
+                  }
                 }}
                 onBlur={(e) => handleRenameConfirm(e.currentTarget.value)}
                 style={{

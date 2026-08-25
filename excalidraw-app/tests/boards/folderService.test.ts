@@ -14,7 +14,8 @@ const makeRepo = () => new LocalStorageBoardRepository();
 
 /** Mock mínimo del ExcalidrawImperativeAPI usado por folderService. */
 function mockApi() {
-  const calls: { sceneElements?: ExcalidrawElement[]; addFiles?: unknown[] }[] = [];
+  const calls: { sceneElements?: ExcalidrawElement[]; addFiles?: unknown[] }[] =
+    [];
   const api = {
     updateScene: vi.fn((opts: { elements?: ExcalidrawElement[] }) => {
       calls.push({ sceneElements: opts.elements });
@@ -28,11 +29,11 @@ function mockApi() {
     getName: vi.fn(() => "test"),
     _calls: calls,
   };
-  return api as unknown as ExcalidrawImperativeAPI & { 
-    _calls: typeof calls; 
-    getSceneElementsIncludingDeleted: any; 
-    getFiles: any; 
-    getName: any; 
+  return api as unknown as ExcalidrawImperativeAPI & {
+    _calls: typeof calls;
+    getSceneElementsIncludingDeleted: any;
+    getFiles: any;
+    getName: any;
     updateScene: any;
   };
 }
@@ -188,7 +189,7 @@ describe("Board System :: folderService (Fase 3)", () => {
 
   it("Problema 1: createFolder syncs current board to repo if parent is current board", async () => {
     const repo = new LocalStorageBoardRepository();
-    const { graph, rootFolderId, rootBoardId } = await seedRoot(repo);
+    const { rootFolderId, rootBoardId } = await seedRoot(repo);
     boardsStoreActions.setCurrentBoardId(rootBoardId);
 
     // Simulate current board having a deleted folder element in excalidrawAPI (not in repo)
@@ -219,7 +220,7 @@ describe("Board System :: folderService (Fase 3)", () => {
 
   it("Problema 2: createFolder assigns monotonic folder numbering automatically", async () => {
     const repo = new LocalStorageBoardRepository();
-    const { graph, rootFolderId } = await seedRoot(repo);
+    const { rootFolderId } = await seedRoot(repo);
     const excalidrawAPI = mockApi();
 
     const r1 = await createFolder({

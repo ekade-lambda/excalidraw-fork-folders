@@ -15,12 +15,13 @@ import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
+import type { ExcalidrawTextElement } from "@excalidraw/element/types";
+
 import { addFolder } from "../domain/graph";
 
 import { boardsStoreActions } from "./boardState";
 import { saveCurrentBoard } from "./boardService";
 import { buildFolderVisual, findFolderVisual } from "./materialize";
-import type { ExcalidrawTextElement } from "@excalidraw/element/types";
 
 import type { BoardId, FolderId } from "../types";
 import type { BoardRepository } from "../repository/BoardRepository";
@@ -134,9 +135,13 @@ export async function renameFolder(opts: {
 
   // 1. Update domain graph
   const graph = await repo.load();
-  if (!graph) return { ok: false, reason: "no-graph" };
+  if (!graph) {
+    return { ok: false, reason: "no-graph" };
+  }
   const folder = graph.folders[folderId];
-  if (!folder) return { ok: false, reason: "folder-not-found" };
+  if (!folder) {
+    return { ok: false, reason: "folder-not-found" };
+  }
 
   folder.name = newName;
   folder.updatedAt = Date.now();
