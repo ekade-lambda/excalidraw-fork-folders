@@ -832,15 +832,6 @@ const ExcalidrawWrapper = () => {
       collabAPI.syncElements(elements);
     }
 
-    if (excalidrawAPI) {
-      import("./boards/host/deletionSync").then(
-        ({ syncDeletionsFromEditor }) => {
-          const repo = new LocalStorageBoardRepository();
-          syncDeletionsFromEditor(elements, repo, excalidrawAPI);
-        },
-      );
-    }
-
     // this check is redundant, but since this is a hot path, it's best
     // not to evaludate the nested expression every time
     if (!LocalData.isSavePaused()) {
