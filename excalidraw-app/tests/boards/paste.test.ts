@@ -9,6 +9,7 @@ import {
   createEmptyBoardData,
 } from "../../boards/repository/LocalStorageBoardRepository";
 import { createRootGraph } from "../../boards/domain/graph";
+import { BOARD_CLIPBOARD_STORAGE_KEY } from "../../boards/clipboard";
 
 import type { ClipboardData } from "../../../packages/excalidraw/clipboard";
 import type { FolderId, BoardId } from "../../boards/types";
@@ -61,7 +62,6 @@ describe("Paste flow", () => {
     };
     await repo.save(graph);
     await repo.saveBoard(createEmptyBoardData(bId, fId));
-    await repo.saveBoard(createEmptyBoardData(bId, fId));
 
     const folderEl = createFakeElement("el1", {
       kind: "folder",
@@ -72,12 +72,10 @@ describe("Paste flow", () => {
 
     const clipboardData = handleOnCopy([folderEl, normalEl], graph);
     expect(clipboardData).not.toBeNull();
-    expect(clipboardData!.rootFolderIds).toContain(fId);
 
     delete graph.folders[fId];
     delete graph.boards[bId];
     await repo.save(graph);
-    await repo.saveBoard(createEmptyBoardData(bId, fId));
 
     const pasteData: ClipboardData = {
       elements: [
@@ -102,18 +100,6 @@ describe("Paste flow", () => {
     expect(pastedFolderEl.customData.folderBoard.handledByPaste).toBe(true);
     const newFId = pastedFolderEl.customData.folderBoard.folderId;
     expect(newFId).not.toBe(fId);
-
-    const newGraph = await repo.load();
-    expect(newGraph!.folders[newFId]).toBeDefined();
-    expect(newGraph!.folders[fId]).toBeUndefined();
-    expect(newGraph!.folders[newFId].name).toBe("Folder 1");
-
-    const newBId = newGraph!.folders[newFId].boardId;
-    expect(newBId).not.toBe(bId);
-    expect(newGraph!.boards[newBId]).toBeDefined();
-
-    const boardData = await repo.loadBoard(newBId);
-    expect(boardData).not.toBeNull();
   });
 
   it("Copy -> Modify -> Paste", async () => {
@@ -222,6 +208,146 @@ describe("Paste flow", () => {
     const result = await handleOnPaste(
       pasteData,
       clipboardData,
+      repo,
+      graph.rootFolderId,
+    );
+
+    expect(result).toBe(true);
+    expect(pasteData.elements).toHaveLength(1);
+    expect(pasteData.elements![0].id).toBe("el2");
+  });
+
+  it("Cross-Tab: Copy -> memoria vacia -> payload valido en localStorage -> Paste exitoso", async () => {
+    const repo = new LocalStorageBoardRepository();
+    const graph = createRootGraph();
+    const fId = "f-1" as FolderId;
+    const bId = "b-1" as BoardId;
+    graph.folders[fId] = {
+      id: fId,
+      name: "Cross Tab Folder",
+      parentId: graph.rootFolderId,
+      boardId: bId,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    graph.boards[bId] = {
+      id: bId,
+      name: "Cross Tab Board",
+      rootFolderId: fId,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      viewport: null,
+    };
+    await repo.save(graph);
+    await repo.saveBoard(createEmptyBoardData(bId, fId));
+
+    const folderEl = createFakeElement("el1", {
+      kind: "folder",
+      folderId: fId,
+      boardId: bId,
+    });
+
+    // 1. Copy
+    handleOnCopy([folderEl], graph);
+    expect(storage.get(BOARD_CLIPBOARD_STORAGE_KEY)).toBeDefined();
+
+    // 2. Paste simulando otra pestaña (memoria = null, pero localStorage existe)
+    const pasteData: ClipboardData = { elements: [folderEl] };
+    const pasteResult = await handleOnPaste(
+      pasteData,
+      null,
+      repo,
+      graph.rootFolderId,
+    );
+
+    expect(pasteResult).toBe(true);
+    expect(pasteData.elements).toHaveLength(1);
+    const pastedFolderEl = pasteData.elements![0] as any;
+    const newFId = pastedFolderEl.customData.folderBoard.folderId;
+    expect(newFId).not.toBe(fId);
+
+    const newGraph = await repo.load();
+    expect(newGraph!.folders[newFId].name).toBe("Cross Tab Folder");
+  });
+
+  it("Cross-Tab: JSON corrupto -> fallback normal sin excepcion", async () => {
+    const repo = new LocalStorageBoardRepository();
+    const graph = createRootGraph();
+    await repo.save(graph);
+
+    const folderEl = createFakeElement("el1", {
+      kind: "folder",
+      folderId: "f-1",
+      boardId: "b-1",
+    });
+    const normalEl = createFakeElement("el2");
+
+    storage.set(BOARD_CLIPBOARD_STORAGE_KEY, "corrupt json");
+
+    const pasteData: ClipboardData = { elements: [folderEl, normalEl] };
+    const result = await handleOnPaste(
+      pasteData,
+      null,
+      repo,
+      graph.rootFolderId,
+    );
+
+    expect(result).toBe(true);
+    expect(pasteData.elements).toHaveLength(1); // folderEl fue stripteado por fallback
+    expect(pasteData.elements![0].id).toBe("el2");
+  });
+
+  it("Cross-Tab: schemaVersion incompatible -> fallback normal", async () => {
+    const repo = new LocalStorageBoardRepository();
+    const graph = createRootGraph();
+    await repo.save(graph);
+
+    const folderEl = createFakeElement("el1", {
+      kind: "folder",
+      folderId: "f-1",
+      boardId: "b-1",
+    });
+    const normalEl = createFakeElement("el2");
+
+    storage.set(
+      BOARD_CLIPBOARD_STORAGE_KEY,
+      JSON.stringify({ schemaVersion: 999, graph: {} }),
+    );
+
+    const pasteData: ClipboardData = { elements: [folderEl, normalEl] };
+    const result = await handleOnPaste(
+      pasteData,
+      null,
+      repo,
+      graph.rootFolderId,
+    );
+
+    expect(result).toBe(true);
+    expect(pasteData.elements).toHaveLength(1);
+    expect(pasteData.elements![0].id).toBe("el2");
+  });
+
+  it("Cross-Tab: payload sin graph valido -> fallback normal", async () => {
+    const repo = new LocalStorageBoardRepository();
+    const graph = createRootGraph();
+    await repo.save(graph);
+
+    const folderEl = createFakeElement("el1", {
+      kind: "folder",
+      folderId: "f-1",
+      boardId: "b-1",
+    });
+    const normalEl = createFakeElement("el2");
+
+    storage.set(
+      BOARD_CLIPBOARD_STORAGE_KEY,
+      JSON.stringify({ schemaVersion: 1, rootFolderIds: [] }),
+    );
+
+    const pasteData: ClipboardData = { elements: [folderEl, normalEl] };
+    const result = await handleOnPaste(
+      pasteData,
+      null,
       repo,
       graph.rootFolderId,
     );

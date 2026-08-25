@@ -1,9 +1,61 @@
 import { cloneFromClipboard } from "../domain/cloneFromClipboard";
 
+import {
+  BOARD_CLIPBOARD_STORAGE_KEY,
+  BOARD_CLIPBOARD_SCHEMA_VERSION,
+} from "../clipboard";
+
+import type {
+  LogicalClipboardData,
+  SerializedLogicalClipboardData,
+} from "../clipboard";
+
 import type { ClipboardData } from "../../../packages/excalidraw/clipboard";
 import type { BoardRepository } from "../repository/BoardRepository";
 import type { FolderId } from "../types";
-import type { LogicalClipboardData } from "../clipboard";
+
+function getCrossTabClipboardData(): LogicalClipboardData | null {
+  try {
+    const raw = window.localStorage.getItem(BOARD_CLIPBOARD_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<SerializedLogicalClipboardData>;
+
+    // Validar version
+    if (parsed.schemaVersion !== BOARD_CLIPBOARD_SCHEMA_VERSION) {
+      console.warn(
+        `Cross-tab clipboard schema mismatch. Expected ${BOARD_CLIPBOARD_SCHEMA_VERSION}, got ${parsed.schemaVersion}`,
+      );
+      return null;
+    }
+
+    // Validar estructura minima
+    if (
+      !parsed.graph ||
+      !parsed.graph.folders ||
+      !parsed.graph.boards ||
+      !parsed.graph.pointers
+    ) {
+      console.warn(
+        "Cross-tab clipboard payload missing valid graph structure.",
+      );
+      return null;
+    }
+    if (
+      !Array.isArray(parsed.rootFolderIds) ||
+      !Array.isArray(parsed.pointerIds)
+    ) {
+      console.warn("Cross-tab clipboard payload missing ids arrays.");
+      return null;
+    }
+
+    return parsed as LogicalClipboardData;
+  } catch (err) {
+    console.warn("Failed to parse cross-tab clipboard data:", err);
+    return null;
+  }
+}
 
 export async function handleOnPaste(
   data: ClipboardData,
@@ -34,13 +86,16 @@ export async function handleOnPaste(
   // Fallback function to abort board clone but keep normal clones
   const abortBoardSystemClone = () => {
     data.elements = data.elements!.filter(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (el: any) => !boardElementsIds.has(el.id),
     );
     return true;
   };
 
   // 3. Validaciones de Clipboard
-  if (!clipboardData) {
+  const activeClipboard = clipboardData ?? getCrossTabClipboardData();
+
+  if (!activeClipboard) {
     console.warn("No logical clipboard data found. Stripping board elements.");
     return abortBoardSystemClone();
   }
@@ -59,15 +114,15 @@ export async function handleOnPaste(
     }
 
     // 5. Construir grafo en memoria con la primitiva pura
-    const res = cloneFromClipboard(clipboardData, graph, targetFolderId);
+    const res = cloneFromClipboard(activeClipboard, graph, targetFolderId);
     if (!res.ok) {
       throw new Error(`cloneFromClipboard failed: ${res.reason}`);
     }
 
-    // 6. Persistir f�sicamente los Boards (Asincrono)
+    // 6. Persistir fisicamente los Boards (Asincrono)
     await boardRepo.clonePhysicalBoards(res.boardIdMap);
 
-    // 7. Persistir Graph l�gico (Asincrono)
+    // 7. Persistir Graph logico (Asincrono)
     await boardRepo.save(res.graph);
 
     // 8. Remapear visual elements y agregar flag handledByPaste, manteniendo orden visual
@@ -101,7 +156,7 @@ export async function handleOnPaste(
       };
     });
 
-    // 9. Retornar true para permitir que el Paste contin�e con la mutaci�n
+    // 9. Retornar true para permitir que el Paste continue con la mutacion
     return true;
   } catch (err) {
     // 10. Manejo de fallos de atomicidad

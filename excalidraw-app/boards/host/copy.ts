@@ -2,8 +2,17 @@ import type { ExcalidrawElement } from "@excalidraw/element/types";
 
 import { extractClipboardSnapshot } from "../domain/cloneFromClipboard";
 
+import {
+  BOARD_CLIPBOARD_STORAGE_KEY,
+  BOARD_CLIPBOARD_SCHEMA_VERSION,
+} from "../clipboard";
+
+import type {
+  LogicalClipboardData,
+  SerializedLogicalClipboardData,
+} from "../clipboard";
+
 import type { BoardsGraph, FolderId, FolderPointerId } from "../types";
-import type { LogicalClipboardData } from "../clipboard";
 
 export function handleOnCopy(
   elements: readonly ExcalidrawElement[],
@@ -27,9 +36,31 @@ export function handleOnCopy(
     }
   }
 
-  return extractClipboardSnapshot(
+  const snapshot = extractClipboardSnapshot(
     graph,
     Array.from(selectedFolderIds),
     Array.from(selectedPointerIds),
   );
+
+  if (snapshot) {
+    try {
+      const payload: SerializedLogicalClipboardData = {
+        ...snapshot,
+        schemaVersion: BOARD_CLIPBOARD_SCHEMA_VERSION,
+      };
+      window.localStorage.setItem(
+        BOARD_CLIPBOARD_STORAGE_KEY,
+        JSON.stringify(payload),
+      );
+    } catch (err) {
+      console.warn(
+        "Failed to serialize cross-tab clipboard to localStorage:",
+        err,
+      );
+    }
+  } else {
+    window.localStorage.removeItem(BOARD_CLIPBOARD_STORAGE_KEY);
+  }
+
+  return snapshot;
 }
