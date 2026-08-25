@@ -8,7 +8,7 @@ import { boardsStoreActions } from "../../boards/host/boardState";
 import { createFolder } from "../../boards/host/folderService";
 import { hitTestFolderAtPoint } from "../../boards/host/hitTest";
 
-describe("pointerService Regression & Acceptance", () => {
+describe("pointerService Regression Tests", () => {
   let repo: LocalStorageBoardRepository;
   let excalidrawAPI: any;
   let currentElements: any[];

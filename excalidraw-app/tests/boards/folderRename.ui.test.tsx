@@ -5,7 +5,7 @@ import { render, fireEvent, screen, waitFor } from "@testing-library/react";
 import ExcalidrawApp from "../../App";
 import { LocalStorageBoardRepository } from "../../boards/repository/LocalStorageBoardRepository";
 
-describe("Folder Rename UI", () => {
+describe("Folder Rename UI Tests", () => {
   beforeEach(() => {
     localStorage.clear();
     const repo = new LocalStorageBoardRepository();
@@ -49,6 +49,12 @@ describe("Folder Rename UI", () => {
 
     const wrapper = container.querySelector(".excalidraw-app")!;
 
+    // Inject a fake excalidraw container to simulate focusContainer()
+    const excalidrawContainer = document.createElement("div");
+    excalidrawContainer.className = "excalidraw-container";
+    excalidrawContainer.tabIndex = -1;
+    wrapper.appendChild(excalidrawContainer);
+
     // We need to inject an element via window.h
     const h = (window as any).h;
 
@@ -87,10 +93,21 @@ describe("Folder Rename UI", () => {
     });
 
     // Click Rename
-    fireEvent.click(screen.getByText("Rename"));
+
+    // Simulamos pointerDown sobre Rename
+    fireEvent.pointerDown(screen.getByText("Rename"));
+
+    // Simulamos que Excalidraw cierra su context-menu en pointerdown (como lo hace en la realidad)
+    document.querySelector(".context-menu")?.remove();
 
     // Input should appear
     const input = screen.getByDisplayValue("Carpeta Vieja") as HTMLInputElement;
+    expect(input).toBeInTheDocument();
+
+    // Simular el robo programático de foco por Excalidraw's focusContainer()
+    fireEvent.blur(input, { relatedTarget: excalidrawContainer });
+
+    // Rename NO debe destruirse
     expect(input).toBeInTheDocument();
 
     // Change value
@@ -114,7 +131,12 @@ describe("Folder Rename UI", () => {
     });
 
     // Click Rename
-    fireEvent.click(screen.getByText("Rename"));
+
+    // Simulamos pointerDown sobre Rename
+    fireEvent.pointerDown(screen.getByText("Rename"));
+
+    // Simulamos que Excalidraw cierra su context-menu en pointerdown (como lo hace en la realidad)
+    document.querySelector(".context-menu")?.remove();
 
     const input2 = screen.getByDisplayValue(
       "Carpeta Vieja",
@@ -140,7 +162,14 @@ describe("Folder Rename UI", () => {
     await waitFor(() => {
       expect(container.querySelector(".excalidraw-app")).not.toBeNull();
     });
+
     const wrapper = container.querySelector(".excalidraw-app")!;
+
+    // Inject a fake excalidraw container to simulate focusContainer()
+    const excalidrawContainer = document.createElement("div");
+    excalidrawContainer.className = "excalidraw-container";
+    excalidrawContainer.tabIndex = -1;
+    wrapper.appendChild(excalidrawContainer);
 
     const h = (window as any).h;
     await waitFor(() => expect(h.elements).toBeDefined());

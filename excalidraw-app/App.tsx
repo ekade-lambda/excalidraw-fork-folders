@@ -568,6 +568,62 @@ const ExcalidrawWrapper = () => {
     editing?: boolean;
   } | null>(null);
 
+  // Global click-outside detector for Rename UI
+  useEffect(() => {
+    if (!renameCtx) {
+      return;
+    }
+
+    const handleGlobalPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node;
+      const renameElement = document.querySelector(".board-rename-ui");
+
+      if (renameElement && renameElement.contains(target)) {
+        // Clicked inside Rename UI, do nothing
+        return;
+      }
+
+      // Clicked outside, close Rename
+      setRenameCtx(null);
+    };
+
+    document.addEventListener("pointerdown", handleGlobalPointerDown, true);
+    return () => {
+      document.removeEventListener(
+        "pointerdown",
+        handleGlobalPointerDown,
+        true,
+      );
+    };
+  }, [renameCtx]);
+
+  // Positioning loop (visual only, NO lifecycle control)
+  useEffect(() => {
+    if (!renameCtx) {
+      return;
+    }
+
+    let rafId: number;
+    const syncPosition = () => {
+      const menuElement = document.querySelector(
+        ".context-menu",
+      ) as HTMLElement | null;
+      const renameElement = document.querySelector(
+        ".board-rename-ui",
+      ) as HTMLElement | null;
+
+      if (menuElement && renameElement) {
+        const menuRect = menuElement.getBoundingClientRect();
+        renameElement.style.left = `${menuRect.right}px`;
+        renameElement.style.top = `${menuRect.top}px`;
+        renameElement.style.transform = `none`;
+      }
+      rafId = requestAnimationFrame(syncPosition);
+    };
+    rafId = requestAnimationFrame(syncPosition);
+    return () => cancelAnimationFrame(rafId);
+  }, [renameCtx]);
+
   const handleHostContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!excalidrawAPI) {
       return;
@@ -1539,6 +1595,7 @@ const ExcalidrawWrapper = () => {
 
         {renameCtx && (
           <div
+            className="board-rename-ui"
             style={{
               position: "absolute",
               top: renameCtx.y,
@@ -1547,7 +1604,7 @@ const ExcalidrawWrapper = () => {
               background: "white",
               padding: "4px",
               boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
-              transform: "translate(0, -110%)",
+              transform: "translate(0, -110%)", // initial fallback position
               borderRadius: "4px",
               display: "flex",
               flexDirection: "column",
@@ -1565,7 +1622,20 @@ const ExcalidrawWrapper = () => {
                     setRenameCtx(null);
                   }
                 }}
-                onBlur={(e) => handleRenameConfirm(e.currentTarget.value)}
+                onBlur={(e) => {
+                  const relatedTarget = e.relatedTarget as HTMLElement | null;
+                  if (
+                    relatedTarget &&
+                    relatedTarget.closest(".excalidraw-container")
+                  ) {
+                    // This blur was caused by Excalidraw's programmatic focusContainer()
+                    // pulling focus away from our input when Popover closed.
+                    // We must ignore this blur and return focus asynchronously.
+                    requestAnimationFrame(() => e.target.focus());
+                    return;
+                  }
+                  handleRenameConfirm(e.currentTarget.value);
+                }}
                 style={{
                   padding: "4px",
                   fontSize: "14px",
@@ -1581,7 +1651,10 @@ const ExcalidrawWrapper = () => {
                   cursor: "pointer",
                   fontWeight: "bold",
                 }}
-                onClick={() => setRenameCtx({ ...renameCtx, editing: true })}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  setRenameCtx({ ...renameCtx, editing: true });
+                }}
               >
                 Rename
               </div>
