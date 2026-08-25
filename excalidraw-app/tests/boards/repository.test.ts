@@ -257,7 +257,7 @@ describe("BoardRepository :: clonePhysicalBoards", () => {
     ]);
 
     await expect(repo.clonePhysicalBoards(map)).rejects.toThrow(
-      "clonePhysicalBoards: Source board missing not found.",
+      "clonePhysicalBoardsSync: Source board missing not found.",
     );
 
     const c1 = await repo.loadBoard("b1-clon");
@@ -271,7 +271,7 @@ describe("BoardRepository :: clonePhysicalBoards", () => {
     const map = new Map<string, string>([["b1", "b1-clon"]]);
 
     await expect(repo.clonePhysicalBoards(map)).rejects.toThrow(
-      "clonePhysicalBoards: Destination board b1-clon already exists.",
+      "clonePhysicalBoardsSync: Destination board b1-clon already exists.",
     );
   });
 });

@@ -1,0 +1,3 @@
+﻿yarn run v1.22.22
+$ C:\Users\ekade\Desktop\EKADE\PROYECTOS\PAGINAS-WEB\NEW-AGE\notas\Agosto-2026-Excalidraw\excalidraw-fork-folders\node_modules\.bin\tsc
+Done in 58.38s.

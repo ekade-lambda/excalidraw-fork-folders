@@ -1,0 +1,32 @@
+﻿yarn run v1.22.22
+$ C:\Users\ekade\Desktop\EKADE\PROYECTOS\PAGINAS-WEB\NEW-AGE\notas\Agosto-2026-Excalidraw\excalidraw-fork-folders\node_modules\.bin\vitest boards --run
+
+[1m[7m[36m RUN [39m[27m[22m [36mv3.0.6 [39m[90mC:/Users/ekade/Desktop/EKADE/PROYECTOS/PAGINAS-WEB/NEW-AGE/notas/Agosto-2026-Excalidraw/excalidraw-fork-folders[39m
+
+ [32mÔ£ô[39m excalidraw-app/tests/boards/reconciler.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 16[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/repository.test.ts [2m([22m[2m15 tests[22m[2m)[22m[90m 31[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/duplicate.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 37[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/cloneSelection.test.ts [2m([22m[2m11 tests[22m[2m)[22m[90m 28[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/repository.transaction.test.ts [2m([22m[2m9 tests[22m[2m)[22m[90m 21[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/delete.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 92[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/copySubtree.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 79[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/navigation.test.ts [2m([22m[2m11 tests[22m[2m)[22m[90m 44[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/graph.test.ts [2m([22m[2m11 tests[22m[2m)[22m[90m 35[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/materialize.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 30[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/pointers.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 69[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/ids.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 131[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/hitTest.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 41[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/boardService.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 62[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/pointer-regression.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 77[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/openFolder.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 103[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/deletionSync.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 63[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/folderService.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 88[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/boardService.navigation.test.ts [2m([22m[2m11 tests[22m[2m)[22m[90m 139[2mms[22m[39m
+ [32mÔ£ô[39m excalidraw-app/tests/boards/pointerService.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 32[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m20 passed[39m[22m[90m (20)[39m
+[2m      Tests [22m [1m[32m139 passed[39m[22m[90m (139)[39m
+[2m   Start at [22m 19:14:31
+[2m   Duration [22m 55.32s[2m (transform 28.83s, setup 130.07s, collect 246.94s, tests 1.22s, environment 110.81s, prepare 15.68s)[22m
+
+Done in 56.79s.

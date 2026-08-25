@@ -62,6 +62,8 @@ import {
   useHandleLibrary,
 } from "@excalidraw/excalidraw/data/library";
 
+import type { ExcalidrawElement } from "@excalidraw/element/types";
+
 import type { RemoteExcalidrawElement } from "@excalidraw/excalidraw/data/reconcile";
 import type { RestoredDataState } from "@excalidraw/excalidraw/data/restore";
 import type {
@@ -79,6 +81,8 @@ import type {
 } from "@excalidraw/excalidraw/types";
 import type { ResolutionType } from "@excalidraw/common/utility-types";
 import type { ResolvablePromise } from "@excalidraw/common/utils";
+
+import { handleOnDuplicate } from "./boards/host/duplicate";
 
 import CustomStats from "./CustomStats";
 import {
@@ -875,6 +879,21 @@ const ExcalidrawWrapper = () => {
     }
   };
 
+  const onDuplicate = useCallback(
+    (
+      nextElements: readonly ExcalidrawElement[],
+      prevElements: readonly ExcalidrawElement[],
+    ) => {
+      return handleOnDuplicate(
+        nextElements,
+        prevElements,
+        boardRepo,
+        boardsStoreActions.getCurrentFolderId(),
+      );
+    },
+    [boardRepo],
+  );
+
   const [latestShareableLink, setLatestShareableLink] = useState<string | null>(
     null,
   );
@@ -1061,6 +1080,7 @@ const ExcalidrawWrapper = () => {
         viewportStatusFrame={viewportStatusFrame}
         userToFollow={userToFollow}
         onChange={onChange}
+        onDuplicate={onDuplicate}
         onExport={onExport}
         initialData={initialStatePromiseRef.current.promise}
         isCollaborating={isCollaborating}

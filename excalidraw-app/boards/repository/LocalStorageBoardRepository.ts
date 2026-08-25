@@ -119,7 +119,7 @@ export class LocalStorageBoardRepository implements BoardRepository {
   // BoardsGraph
   // ------------------------------------------------------------------
 
-  async load(): Promise<BoardsGraph | null> {
+  loadSync(): BoardsGraph | null {
     const raw = safeGet(STORAGE_KEYS.BOARDS_GRAPH);
     if (raw == null) {
       return null;
@@ -127,7 +127,7 @@ export class LocalStorageBoardRepository implements BoardRepository {
 
     const parsed = parseJsonObject<BoardsGraph>(raw);
     if (!parsed || !shapeIsGraph(parsed)) {
-      // Gráfica corrupta/shape inválido → backup + raíz nueva.
+      // Gráfica corrupta/shape inválido -> backup + raíz nueva.
       safeSet(STORAGE_KEYS.BOARDS_GRAPH_BROKEN, raw);
       safeRemove(STORAGE_KEYS.BOARDS_GRAPH);
       console.warn(
@@ -136,7 +136,7 @@ export class LocalStorageBoardRepository implements BoardRepository {
       return createRootGraph();
     }
 
-    // Migraciones encadenadas vN → N+1 hasta la versión actual.
+    // Migraciones encadenadas vN -> N+1 hasta la versión actual.
     let graph = parsed;
     let version = parsed.schemaVersion;
     while (version < this.schemaVersion) {
@@ -154,18 +154,26 @@ export class LocalStorageBoardRepository implements BoardRepository {
       : graph;
   }
 
-  async save(graph: BoardsGraph): Promise<void> {
+  async load(): Promise<BoardsGraph | null> {
+    return this.loadSync();
+  }
+
+  saveSync(graph: BoardsGraph): void {
     safeSet(
       STORAGE_KEYS.BOARDS_GRAPH,
       JSON.stringify({ ...graph, schemaVersion: this.schemaVersion }),
     );
   }
 
+  async save(graph: BoardsGraph): Promise<void> {
+    return this.saveSync(graph);
+  }
+
   // ------------------------------------------------------------------
   // BoardData
   // ------------------------------------------------------------------
 
-  async loadBoard(boardId: BoardId): Promise<BoardData | null> {
+  loadBoardSync(boardId: BoardId): BoardData | null {
     const raw = safeGet(boardKey(boardId));
     if (raw == null) {
       return null;
@@ -173,7 +181,7 @@ export class LocalStorageBoardRepository implements BoardRepository {
 
     const parsed = parseJsonObject<BoardData>(raw);
     if (!parsed || !shapeIsBoardData(parsed)) {
-      // Board payload corrupto → reconstruir vacío (no romper el grafo).
+      // Board payload corrupto -> reconstruir vacío (no romper el grafo).
       console.warn(
         `BoardRepository: BoardData corrupto para ${boardId}. Se reconstruye vacío.`,
       );
@@ -197,11 +205,19 @@ export class LocalStorageBoardRepository implements BoardRepository {
       : data;
   }
 
-  async saveBoard(boardData: BoardData): Promise<void> {
+  async loadBoard(boardId: BoardId): Promise<BoardData | null> {
+    return this.loadBoardSync(boardId);
+  }
+
+  saveBoardSync(boardData: BoardData): void {
     safeSet(
       boardKey(boardData.boardId),
       JSON.stringify({ ...boardData, schemaVersion: this.schemaVersion }),
     );
+  }
+
+  async saveBoard(boardData: BoardData): Promise<void> {
+    return this.saveBoardSync(boardData);
   }
 
   async deleteBoard(boardId: BoardId): Promise<void> {
@@ -260,32 +276,27 @@ export class LocalStorageBoardRepository implements BoardRepository {
     return nextGraph;
   }
 
-  async clonePhysicalBoards(
-    oldToNewBoardMap: Map<BoardId, BoardId>,
-  ): Promise<void> {
+  clonePhysicalBoardsSync(oldToNewBoardMap: Map<BoardId, BoardId>): void {
     // 1. Verificamos que los destinos NO existan.
-    // Esto previene corrupciones silenciosas si el UUID falló.
     for (const newBId of oldToNewBoardMap.values()) {
       const existing = safeGet(boardKey(newBId));
       if (existing !== null) {
         throw new Error(
-          `clonePhysicalBoards: Destination board ${newBId} already exists.`,
+          `clonePhysicalBoardsSync: Destination board ${newBId} already exists.`,
         );
       }
     }
 
     // 2. Cargamos todos los orígenes en memoria ANTES de empezar a escribir.
-    // Si uno falla (no existe), abortamos antes de hacer I/O destructivo / parcial.
     const boardsToSave: BoardData[] = [];
     for (const [oldBId, newBId] of oldToNewBoardMap.entries()) {
-      const srcPayload = await this.loadBoard(oldBId);
+      const srcPayload = this.loadBoardSync(oldBId);
       if (!srcPayload) {
         throw new Error(
-          `clonePhysicalBoards: Source board ${oldBId} not found.`,
+          `clonePhysicalBoardsSync: Source board ${oldBId} not found.`,
         );
       }
 
-      // Copia profunda real e independiente (evita aliasing mutable)
       const clonedPayload: BoardData = JSON.parse(JSON.stringify(srcPayload));
       clonedPayload.boardId = newBId;
       clonedPayload.updatedAt = Date.now();
@@ -293,13 +304,15 @@ export class LocalStorageBoardRepository implements BoardRepository {
       boardsToSave.push(clonedPayload);
     }
 
-    // 3. Persistimos los boards nuevos físicamente en un ciclo best-effort.
-    // Límite de atomicidad: si localStorage explota por cuota a la mitad de este array,
-    // algunos boards se habrán escrito y otros no. Sin embargo, no modificamos
-    // el BoardsGraph aquí, por lo que el Graph maestro sigue apuntando a los viejos.
-    // La basura física generada no corrompería la UI, pero ocupará cuota.
+    // 3. Persistimos best-effort síncrono.
     for (const payload of boardsToSave) {
-      await this.saveBoard(payload);
+      this.saveBoardSync(payload);
     }
+  }
+
+  async clonePhysicalBoards(
+    oldToNewBoardMap: Map<BoardId, BoardId>,
+  ): Promise<void> {
+    return this.clonePhysicalBoardsSync(oldToNewBoardMap);
   }
 }

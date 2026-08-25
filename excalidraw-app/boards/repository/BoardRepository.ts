@@ -57,4 +57,17 @@ export interface BoardRepository {
    * Si falla a la mitad, algunos boards nuevos quedarán escritos. No modifica el Graph.
    */
   clonePhysicalBoards(oldToNewBoardMap: Map<BoardId, BoardId>): Promise<void>;
+
+  // ------------------------------------------------------------------
+  // Synchronous Capabilities (Optional)
+  // ------------------------------------------------------------------
+
+  /** Carga la graph global de manera síncrona si el repositorio lo soporta. */
+  loadSync?(): BoardsGraph | null;
+
+  /** Persiste la graph global de manera síncrona si el repositorio lo soporta. */
+  saveSync?(graph: BoardsGraph): void;
+
+  /** Clona físicamente una colección de Boards de manera síncrona si el repositorio lo soporta. */
+  clonePhysicalBoardsSync?(oldToNewBoardMap: Map<BoardId, BoardId>): void;
 }
