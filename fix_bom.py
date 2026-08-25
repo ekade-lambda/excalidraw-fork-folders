@@ -1,5 +1,5 @@
 ﻿import os
-path = 'excalidraw-app/tests/boards/workspace.test.ts'
+path = 'excalidraw-app/boards/ui/NavBar.tsx'
 with open(path, 'rb') as f:
     content = f.read()
 if content.startswith(b'\xef\xbb\xbf'):
