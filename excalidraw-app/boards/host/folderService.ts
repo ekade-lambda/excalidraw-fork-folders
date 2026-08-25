@@ -17,7 +17,10 @@ import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 import { addFolder } from "../domain/graph";
 
-import { buildFolderVisual } from "./materialize";
+import { boardsStoreActions } from "./boardState";
+import { saveCurrentBoard } from "./boardService";
+import { buildFolderVisual, findFolderVisual } from "./materialize";
+import type { ExcalidrawTextElement } from "@excalidraw/element/types";
 
 import type { BoardId, FolderId } from "../types";
 import type { BoardRepository } from "../repository/BoardRepository";
@@ -35,19 +38,30 @@ export async function createFolder(opts: {
   repo: BoardRepository;
   excalidrawAPI: ExcalidrawImperativeAPI;
   parentFolderId: FolderId;
-  name: string;
+  name?: string;
   sceneX: number;
   sceneY: number;
 }): Promise<CreateFolderResult> {
-  const { repo, excalidrawAPI, parentFolderId, name, sceneX, sceneY } = opts;
+  const { repo, excalidrawAPI, parentFolderId, sceneX, sceneY } = opts;
 
   const graph = await repo.load();
   if (!graph) {
     return { ok: false, reason: "no-graph" };
   }
 
+  // Problema 2: Numeración monotónica
+  let finalName = opts.name;
+  if (!finalName) {
+    graph.folderCounter = (graph.folderCounter || 0) + 1;
+    finalName = `Carpeta ${graph.folderCounter}`;
+  }
+
   // Dominio: crea folder + board (respeta invariantes del grafo).
-  const addResult = addFolder(graph, { name, parentId: parentFolderId });
+  const addResult = addFolder(graph, {
+    name: finalName,
+    parentId: parentFolderId,
+  });
+
   if (!addResult.ok) {
     return { ok: false, reason: "parent-not-found" };
   }
@@ -65,12 +79,19 @@ export async function createFolder(opts: {
     elements: [],
     files: {},
     viewport: null,
-    name,
+    name: finalName,
     updatedAt: Date.now(),
   });
 
   // Representación visual en el board PARENT (el activo).
   const parentBoardId = addResult.graph.folders[parentFolderId].boardId;
+  // Problema 1: Sincronizar la memoria activa del editor con el repositorio ANTES de leer
+  // parentData, para garantizar que los elementos recién borrados tengan isDeleted: true.
+  const currentBoardId = boardsStoreActions.getCurrentBoardId();
+  if (parentBoardId === currentBoardId) {
+    await saveCurrentBoard(excalidrawAPI, repo, currentBoardId);
+  }
+
   const parentData = await repo.loadBoard(parentBoardId);
   if (!parentData) {
     return { ok: true, folderId, boardId };
@@ -79,7 +100,7 @@ export async function createFolder(opts: {
   const { primary, text, fileId, imageFile } = buildFolderVisual({
     folderId,
     boardId,
-    name,
+    name: finalName,
     sceneX,
     sceneY,
   });
@@ -101,4 +122,58 @@ export async function createFolder(opts: {
   excalidrawAPI.addFiles([imageFile]);
 
   return { ok: true, folderId, boardId };
+}
+
+export async function renameFolder(opts: {
+  repo: BoardRepository;
+  excalidrawAPI: ExcalidrawImperativeAPI;
+  folderId: FolderId;
+  newName: string;
+}): Promise<{ ok: boolean; reason?: string }> {
+  const { repo, excalidrawAPI, folderId, newName } = opts;
+
+  // 1. Update domain graph
+  const graph = await repo.load();
+  if (!graph) return { ok: false, reason: "no-graph" };
+  const folder = graph.folders[folderId];
+  if (!folder) return { ok: false, reason: "folder-not-found" };
+
+  folder.name = newName;
+  folder.updatedAt = Date.now();
+
+  const boardId = folder.boardId;
+  const board = graph.boards[boardId];
+  if (board) {
+    board.name = newName;
+    board.updatedAt = Date.now();
+  }
+
+  await repo.save(graph);
+
+  // 2. Locate text element in currently active scene and update it visually
+  const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
+  const folderVisual = findFolderVisual(elements, folderId);
+
+  if (folderVisual && folderVisual.text) {
+    const textEl = folderVisual.text as ExcalidrawTextElement;
+    // Classic mutation pattern in Excalidraw
+    const mutated = {
+      ...textEl,
+      text: newName,
+      originalText: newName,
+      width: Math.max(120, newName.length * 10), // Aprox resizing
+    };
+
+    const nextElements = elements.map((e) =>
+      e.id === textEl.id ? mutated : e,
+    );
+
+    // Use CaptureUpdateAction.NEVER so it avoids diverging if user calls Undo
+    excalidrawAPI.updateScene({
+      elements: nextElements,
+      captureUpdate: CaptureUpdateAction.NEVER,
+    });
+  }
+
+  return { ok: true };
 }

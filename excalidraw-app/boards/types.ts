@@ -75,6 +75,8 @@ export interface BoardsGraph {
   boards: Record<BoardId, Board>;
   /** Restaura el board abierto al recargar. */
   lastOpenBoardId: BoardId | null;
+  /** Contador monotónico para generación de nombres por defecto. */
+  folderCounter?: number;
 }
 
 /** Contenido persistido de un board (Fase 1+). Dominio puro: solo tipo. */

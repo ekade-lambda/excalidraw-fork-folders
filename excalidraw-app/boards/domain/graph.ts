@@ -40,6 +40,7 @@ export function cloneGraph(graph: BoardsGraph): BoardsGraph {
     pointers,
     boards,
     lastOpenBoardId: graph.lastOpenBoardId ?? null,
+    folderCounter: graph.folderCounter,
   };
 }
 
@@ -73,6 +74,7 @@ export function createRootGraph(opts?: { name?: string }): BoardsGraph {
     pointers: {},
     boards: { [rootBoardId]: rootBoard },
     lastOpenBoardId: rootBoardId,
+    folderCounter: 0,
   };
 }
 

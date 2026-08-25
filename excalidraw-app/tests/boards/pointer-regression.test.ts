@@ -27,6 +27,9 @@ describe("pointerService Regression & Acceptance", () => {
 
     excalidrawAPI = {
       addFiles: () => {},
+      getSceneElementsIncludingDeleted: () => elements,
+      getName: () => "test",
+      getFiles: () => ({}),
       getSceneElementsIncludingDeleted: () => currentElements,
       updateScene: (opts: any) => {
         lastUpdateSceneOpts = opts;

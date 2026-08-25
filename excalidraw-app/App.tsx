@@ -164,6 +164,7 @@ import { createFolder } from "./boards/host/folderService";
 import { boardsStoreActions } from "./boards/host/boardState";
 import { openFolder } from "./boards/host/boardService";
 import { hitTestFolderAtPoint } from "./boards/host/hitTest";
+import { renameFolder } from "./boards/host/folderService";
 import {
   FOLDER_TOOL_CUSTOM_TYPE,
   FOLDER_POINTER_TOOL_CUSTOM_TYPE,
@@ -541,7 +542,7 @@ const ExcalidrawWrapper = () => {
             repo: new LocalStorageBoardRepository(),
             excalidrawAPI,
             parentFolderId,
-            name: `Carpeta ${Math.floor(Math.random() * 1000)}`,
+
             sceneX,
             sceneY,
           }).catch((error) => {
@@ -557,6 +558,67 @@ const ExcalidrawWrapper = () => {
 
   // Board System — doble clic (Fase 4 y 6): si el punto cae sobre la representación
   // de una Folder o Pointer, abre su Board correspondiente.
+
+  // State for Problem 3 (Rename Folder)
+  const [renameCtx, setRenameCtx] = useState<{
+    folderId: string;
+    initialName: string;
+    x: number;
+    y: number;
+    editing?: boolean;
+  } | null>(null);
+
+  const handleHostContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!excalidrawAPI) return;
+    const { clientX, clientY } = event;
+    const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
+      { clientX, clientY },
+      excalidrawAPI.getAppState(),
+    );
+    const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
+    const hit = hitTestFolderAtPoint(elements, { x: sceneX, y: sceneY });
+
+    if (hit.kind !== "none") {
+      let fId = hit.kind === "folder" ? hit.folderId : hit.targetFolderId;
+      let initialName = "";
+      for (const el of elements) {
+        const m = el.customData?.folderBoard;
+        if (
+          m &&
+          (m.folderId === fId || m.targetFolderId === fId) &&
+          m.role === "text"
+        ) {
+          initialName = (el as any).text || "";
+          break;
+        }
+      }
+
+      // It's a folder or pointer, intercept native context menu
+      event.preventDefault();
+      event.stopPropagation();
+      setRenameCtx({
+        folderId: fId,
+        initialName: initialName,
+        x: clientX,
+        y: clientY,
+      });
+    } else {
+      setRenameCtx(null);
+    }
+  };
+
+  const handleRenameConfirm = (newName: string) => {
+    if (renameCtx && newName && newName.trim() && excalidrawAPI) {
+      renameFolder({
+        repo: boardRepo,
+        excalidrawAPI,
+        folderId: renameCtx.folderId,
+        newName: newName.trim(),
+      }).catch((e) => console.error("Rename failed", e));
+    }
+    setRenameCtx(null);
+  };
+
   const handleCanvasDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!excalidrawAPI) {
       return;
@@ -1472,6 +1534,55 @@ const ExcalidrawWrapper = () => {
             ref={debugCanvasRef}
           />
         )}
+
+        {renameCtx && (
+          <div
+            style={{
+              position: "absolute",
+              top: renameCtx.y,
+              left: renameCtx.x,
+              zIndex: 999999,
+              background: "white",
+              padding: "4px",
+              boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+              borderRadius: "4px",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {renameCtx.editing ? (
+              <input
+                autoFocus
+                defaultValue={renameCtx.initialName}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter")
+                    handleRenameConfirm(e.currentTarget.value);
+                  if (e.key === "Escape") setRenameCtx(null);
+                }}
+                onBlur={(e) => handleRenameConfirm(e.currentTarget.value)}
+                style={{
+                  padding: "4px",
+                  fontSize: "14px",
+                  border: "1px solid #ccc",
+                  borderRadius: "2px",
+                  outline: "none",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  padding: "4px 8px",
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                }}
+                onClick={() => setRenameCtx({ ...renameCtx, editing: true })}
+              >
+                Rename
+              </div>
+            )}
+          </div>
+        )}
+
         {pointerPickerPos && excalidrawAPI && (
           <PickerFolderDialog
             repo={boardRepo}

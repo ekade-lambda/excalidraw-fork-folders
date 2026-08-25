@@ -17,6 +17,8 @@ describe("pointerService", () => {
     excalidrawAPI = {
       addFiles: () => {},
       getSceneElementsIncludingDeleted: () => elements,
+      getName: () => "test",
+      getFiles: () => ({}),
       updateScene: (opts: any) => {
         if (opts.elements) {
           elements = opts.elements;

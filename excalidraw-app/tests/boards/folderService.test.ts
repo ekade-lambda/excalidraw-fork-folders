@@ -14,8 +14,7 @@ const makeRepo = () => new LocalStorageBoardRepository();
 
 /** Mock mínimo del ExcalidrawImperativeAPI usado por folderService. */
 function mockApi() {
-  const calls: { sceneElements?: ExcalidrawElement[]; addFiles?: unknown[] }[] =
-    [];
+  const calls: { sceneElements?: ExcalidrawElement[]; addFiles?: unknown[] }[] = [];
   const api = {
     updateScene: vi.fn((opts: { elements?: ExcalidrawElement[] }) => {
       calls.push({ sceneElements: opts.elements });
@@ -24,9 +23,18 @@ function mockApi() {
       calls[calls.length - 1].addFiles = files;
     }),
     getAppState: vi.fn(() => ({})),
+    getSceneElementsIncludingDeleted: vi.fn(() => []),
+    getFiles: vi.fn(() => ({})),
+    getName: vi.fn(() => "test"),
     _calls: calls,
   };
-  return api as unknown as ExcalidrawImperativeAPI & { _calls: typeof calls };
+  return api as unknown as ExcalidrawImperativeAPI & { 
+    _calls: typeof calls; 
+    getSceneElementsIncludingDeleted: any; 
+    getFiles: any; 
+    getName: any; 
+    updateScene: any;
+  };
 }
 
 function resetBoardsStore() {
@@ -176,5 +184,135 @@ describe("Board System :: folderService (Fase 3)", () => {
     // El board padre acumula 4 elementos (2 por folder).
     const parentData = await repo.loadBoard(rootBoardId);
     expect(parentData!.elements.length).toBe(4);
+  });
+
+  it("Problema 1: createFolder syncs current board to repo if parent is current board", async () => {
+    const repo = new LocalStorageBoardRepository();
+    const { graph, rootFolderId, rootBoardId } = await seedRoot(repo);
+    boardsStoreActions.setCurrentBoardId(rootBoardId);
+
+    // Simulate current board having a deleted folder element in excalidrawAPI (not in repo)
+    const excalidrawAPI = mockApi();
+    excalidrawAPI.getSceneElementsIncludingDeleted = vi
+      .fn()
+      .mockReturnValue([{ id: "el1", isDeleted: true } as any]);
+
+    // Ensure repo has OLD elements
+    const oldBoard = await repo.loadBoard(rootBoardId);
+    oldBoard!.elements = [{ id: "el1", isDeleted: false } as any];
+    await repo.saveBoard(oldBoard!);
+
+    // Create new folder
+    await createFolder({
+      repo,
+      excalidrawAPI,
+      parentFolderId: rootFolderId,
+      sceneX: 0,
+      sceneY: 0,
+    });
+
+    // Validate that repo was synced BEFORE parentData was read
+    // meaning the new elements should contain the isDeleted: true element, not the false one
+    const updatedBoard = await repo.loadBoard(rootBoardId);
+    expect(updatedBoard!.elements[0].isDeleted).toBe(true);
+  });
+
+  it("Problema 2: createFolder assigns monotonic folder numbering automatically", async () => {
+    const repo = new LocalStorageBoardRepository();
+    const { graph, rootFolderId } = await seedRoot(repo);
+    const excalidrawAPI = mockApi();
+
+    const r1 = await createFolder({
+      repo,
+      excalidrawAPI,
+      parentFolderId: rootFolderId,
+      sceneX: 0,
+      sceneY: 0,
+    });
+    const r2 = await createFolder({
+      repo,
+      excalidrawAPI,
+      parentFolderId: rootFolderId,
+      sceneX: 0,
+      sceneY: 0,
+    });
+
+    const updatedGraph = await repo.load();
+    // Assuming root graph counter started at undefined, folderCounter should be 2
+    expect(updatedGraph!.folderCounter).toBe(2);
+    expect(updatedGraph!.folders[(r1 as any).folderId].name).toBe("Carpeta 1");
+    expect(updatedGraph!.folders[(r2 as any).folderId].name).toBe("Carpeta 2");
+
+    // Delete Carpeta 2 logically (simulate)
+    // Create a new folder
+    const r3 = await createFolder({
+      repo,
+      excalidrawAPI,
+      parentFolderId: rootFolderId,
+      sceneX: 0,
+      sceneY: 0,
+    });
+    const finalGraph = await repo.load();
+    expect(finalGraph!.folders[(r3 as any).folderId].name).toBe("Carpeta 3"); // Monotonic!
+  });
+
+  it("Problema 3: renameFolder updates graph and scene without triggering undo divergence", async () => {
+    const repo = new LocalStorageBoardRepository();
+    const { graph, rootFolderId } = await seedRoot(repo);
+    const excalidrawAPI = mockApi();
+
+    // Insert a folder visually so renameFolder finds it
+    const fId = "f-target";
+    const bId = "b-target";
+    graph.folders[fId] = {
+      id: fId,
+      name: "Carpeta 1",
+      parentId: rootFolderId,
+      boardId: bId,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    graph.boards[bId] = {
+      id: bId,
+      name: "Carpeta 1",
+      rootFolderId: fId,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    await repo.save(graph);
+
+    const textElement = {
+      id: "text-1",
+      customData: {
+        folderBoard: { kind: "folder", role: "text", folderId: fId },
+      },
+      text: "Carpeta 1",
+      originalText: "Carpeta 1",
+    };
+    excalidrawAPI.getSceneElementsIncludingDeleted = vi
+      .fn()
+      .mockReturnValue([textElement as any]);
+
+    // Import dynamically since renameFolder might not be imported at top level
+    const { renameFolder } = await import("../../boards/host/folderService");
+
+    const res = await renameFolder({
+      repo,
+      excalidrawAPI,
+      folderId: fId,
+      newName: "Biology",
+    });
+
+    expect(res.ok).toBe(true);
+
+    const updatedGraph = await repo.load();
+    expect(updatedGraph!.folders[fId].name).toBe("Biology");
+    expect(updatedGraph!.boards[bId].name).toBe("Biology");
+
+    // Check updateScene call
+    expect(excalidrawAPI.updateScene).toHaveBeenCalled();
+    const updateCall = (excalidrawAPI.updateScene as any).mock.calls[0][0];
+    expect(updateCall.captureUpdate).toBe("NEVER"); // NEVER as string enum
+    expect(updateCall.elements[0].text).toBe("Biology");
   });
 });
