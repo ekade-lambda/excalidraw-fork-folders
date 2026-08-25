@@ -52,6 +52,7 @@ export const STORAGE_KEYS = {
   BOARDS_GRAPH: "excalidraw-boards-graph",
   BOARDS_GRAPH_BROKEN: "excalidraw-boards-graph-broken",
   BOARDS_BOARD_PREFIX: "excalidraw-board-",
+  BOARDS_WAR_PREFIX: "excalidraw-war-",
 
   // do not use apart from migrations
   __LEGACY_LOCAL_STORAGE_LIBRARY: "excalidraw-library",

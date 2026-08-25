@@ -57,6 +57,11 @@ export interface BoardRepository {
    * Si falla a la mitad, algunos boards nuevos quedarán escritos. No modifica el Graph.
    */
   clonePhysicalBoards(oldToNewBoardMap: Map<BoardId, BoardId>): Promise<void>;
+  runWithActiveWrites<T>(
+    boardIds: BoardId[],
+    operation: () => Promise<T>,
+  ): Promise<T>;
+  runGarbageCollector(graph: BoardsGraph): Promise<void>;
 
   // ------------------------------------------------------------------
   // Synchronous Capabilities (Optional)
