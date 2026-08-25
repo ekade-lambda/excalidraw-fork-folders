@@ -249,4 +249,37 @@ describe("onDuplicate flow", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((newImg as any).customData!.folderBoard!.folderId).not.toBe("f1");
   });
+  it("Strips handledByPaste flag without cloning again", () => {
+    const repo = new LocalStorageBoardRepository();
+    const prevElements: ExcalidrawElement[] = [];
+    const duplicatedElements = [
+      {
+        id: "el2",
+        type: "rectangle",
+        customData: {
+          folderBoard: {
+            kind: "folder",
+            folderId: "f-1",
+            handledByPaste: true,
+          },
+        },
+      },
+    ] as any;
+
+    const nextElements = [...prevElements, ...duplicatedElements];
+
+    const result = handleOnDuplicate(
+      nextElements,
+      prevElements,
+      repo,
+      "root" as any,
+    );
+
+    expect(result).toBeDefined();
+    expect(result!.length).toBe(1);
+    expect(
+      (result![0] as any).customData.folderBoard.handledByPaste,
+    ).toBeUndefined();
+    expect((result![0] as any).customData.folderBoard.folderId).toBe("f-1");
+  });
 });

@@ -23,11 +23,16 @@ export function handleOnDuplicate(
   const folderIdsToClone = new Set<string>();
   const pointerIdsToClone = new Set<string>();
   const boardSystemClones: ExcalidrawElement[] = [];
+  const handledByPasteIds = new Set<string>();
 
   for (const el of duplicatedElements) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = (el as any).customData?.folderBoard;
     if (meta) {
+      if (meta.handledByPaste) {
+        handledByPasteIds.add(el.id);
+        continue;
+      }
       boardSystemClones.push(el);
       if (meta.kind === "folder" && typeof meta.folderId === "string") {
         folderIdsToClone.add(meta.folderId);
@@ -40,15 +45,43 @@ export function handleOnDuplicate(
     }
   }
 
-  // 3. Ignorar elementos normales sin metadata
+  // 3. Ignorar elementos normales sin metadata, o limpiar handledByPaste
   if (boardSystemClones.length === 0) {
+    if (handledByPasteIds.size > 0) {
+      // Remover flag de handledByPaste para no dejar rastro
+      return nextElements.map((el) => {
+        if (!handledByPasteIds.has(el.id)) {
+          return el;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const meta = { ...(el as any).customData?.folderBoard };
+        delete meta.handledByPaste;
+        return {
+          ...el,
+          customData: { ...el.customData, folderBoard: meta },
+        };
+      });
+    }
     return undefined; // normal behavior
   }
 
   // Fallback function to abort board clone but keep normal clones
   const abortBoardSystemClone = () => {
     const cloneIds = new Set(boardSystemClones.map((el) => el.id));
-    return nextElements.filter((el) => !cloneIds.has(el.id));
+    return nextElements
+      .map((el) => {
+        if (!handledByPasteIds.has(el.id)) {
+          return el;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const meta = { ...(el as any).customData?.folderBoard };
+        delete meta.handledByPaste;
+        return {
+          ...el,
+          customData: { ...el.customData, folderBoard: meta },
+        };
+      })
+      .filter((el) => !cloneIds.has(el.id));
   };
 
   // 4. Fallback de capability
@@ -95,6 +128,17 @@ export function handleOnDuplicate(
 
     // 9. Remapear y retornar los elementos visuales
     return nextElements.map((el) => {
+      // Si fue procesado por paste, solamente limpiar el flag
+      if (handledByPasteIds.has(el.id)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const meta = { ...(el as any).customData?.folderBoard };
+        delete meta.handledByPaste;
+        return {
+          ...el,
+          customData: { ...el.customData, folderBoard: meta },
+        };
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const meta = (el as any).customData?.folderBoard;
       if (!meta || prevIds.has(el.id)) {

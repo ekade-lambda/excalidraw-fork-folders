@@ -153,6 +153,11 @@ import "./index.scss";
 
 import { ExcalidrawPlusPromoBanner } from "./components/ExcalidrawPlusPromoBanner";
 import { AppSidebar } from "./components/AppSidebar";
+
+import { sessionClipboardAtom } from "./boards/clipboard";
+import { handleOnCopy } from "./boards/host/copy";
+import { handleOnPaste } from "./boards/host/paste";
+
 import { initializeBoardSystem } from "./boards/host/boardService";
 import { LocalStorageBoardRepository } from "./boards/repository/LocalStorageBoardRepository";
 import { createFolder } from "./boards/host/folderService";
@@ -879,6 +884,33 @@ const ExcalidrawWrapper = () => {
     }
   };
 
+  const [clipboardData, setClipboardData] = useAtom(sessionClipboardAtom);
+
+  const onCopy = useCallback(
+    (elements: readonly ExcalidrawElement[]) => {
+      if (boardRepo.loadSync) {
+        const graph = boardRepo.loadSync();
+        if (graph) {
+          setClipboardData(handleOnCopy(elements, graph));
+        }
+      }
+    },
+    [boardRepo, setClipboardData],
+  );
+
+  const onPaste = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (data: any, event: ClipboardEvent | null) => {
+      return handleOnPaste(
+        data,
+        clipboardData,
+        boardRepo,
+        boardsStoreActions.getCurrentFolderId(),
+      );
+    },
+    [boardRepo, clipboardData],
+  );
+
   const onDuplicate = useCallback(
     (
       nextElements: readonly ExcalidrawElement[],
@@ -1081,6 +1113,8 @@ const ExcalidrawWrapper = () => {
         userToFollow={userToFollow}
         onChange={onChange}
         onDuplicate={onDuplicate}
+        onCopy={onCopy}
+        onPaste={onPaste}
         onExport={onExport}
         initialData={initialStatePromiseRef.current.promise}
         isCollaborating={isCollaborating}
