@@ -44,6 +44,12 @@ export const actionCopy = register<ClipboardEvent | null>({
       };
     }
 
+    try {
+      app.props.onCopy?.(elementsToCopy);
+    } catch (error: any) {
+      console.error(error);
+    }
+
     return {
       captureUpdate: CaptureUpdateAction.EVENTUALLY,
     };

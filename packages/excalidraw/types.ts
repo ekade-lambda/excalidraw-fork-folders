@@ -818,6 +818,7 @@ export interface ExcalidrawProps {
     button: "down" | "up";
     pointersMap: Gesture["pointers"];
   }) => void;
+  onCopy?: (elements: readonly ExcalidrawElement[]) => void;
   onPaste?: (
     data: ClipboardData,
     event: ClipboardEvent | null,
