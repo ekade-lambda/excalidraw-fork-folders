@@ -35,7 +35,7 @@ export const NavBar = ({
   repo: BoardRepository;
   excalidrawAPI: ExcalidrawImperativeAPI;
 }) => {
-  const { currentFolderId, navigationHistory } = useBoardsState();
+  const { currentFolderId, navigationHistory, graphVersion } = useBoardsState();
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([]);
 
   // Cargar el grafo y derivar el breadcrumb cuando cambie el folder actual.
@@ -62,7 +62,7 @@ export const NavBar = ({
     return () => {
       cancelled = true;
     };
-  }, [repo, currentFolderId]);
+  }, [repo, currentFolderId, graphVersion]);
 
   const backEnabled = canGoBack(navigationHistory);
   const forwardEnabled = canGoForward(navigationHistory);

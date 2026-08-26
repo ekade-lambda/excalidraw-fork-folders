@@ -1,7 +1,4 @@
-﻿import os
-
-path = "checkpoint_integridad_10A_10B_10C.md"
-content = """# ÚLTIMO CHECKPOINT DE INTEGRIDAD DEL CICLO 10A → 10B → 10C
+# ÚLTIMO CHECKPOINT DE INTEGRIDAD DEL CICLO 10A → 10B → 10C
 
 ## 1. Estado general del ciclo
 Las tres fases conviven arquitectónicamente de forma sólida. La autoridad estructural sigue intacta (Graph) y la renderización en memoria (Canvas) no se sobreescribe ni corrompe ante eventos `storage` concurrentes desde otra pestaña.
@@ -78,7 +75,3 @@ Confirmo explícitamente que esta auditoría **NO ha modificado absolutamente ni
 
 ---
 CICLO 10A → 10B → 10C REQUIERE REVISIÓN
-"""
-with open(path, "w", encoding="utf-8") as f:
-    f.write(content)
-print("Generado")

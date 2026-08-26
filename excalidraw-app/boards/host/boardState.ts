@@ -18,6 +18,7 @@ export const currentBoardIdAtom = atom<BoardId | null>(null);
 export const currentFolderIdAtom = atom<FolderId | null>(null);
 export const boardDataAtom = atom<BoardData | null>(null);
 export const boardsReadyAtom = atom<boolean>(false);
+export const graphVersionAtom = atom<number>(0);
 
 /** Historial de navegación (Fase 5). */
 export const navigationHistoryAtom = atom<NavigationHistory>({
@@ -34,6 +35,8 @@ export const boardsStoreActions = {
   setBoardData: (data: BoardData | null) =>
     appJotaiStore.set(boardDataAtom, data),
   setReady: (ready: boolean) => appJotaiStore.set(boardsReadyAtom, ready),
+  incrementGraphVersion: () =>
+    appJotaiStore.set(graphVersionAtom, (v) => v + 1),
 
   getCurrentBoardId: () => appJotaiStore.get(currentBoardIdAtom),
   getCurrentFolderId: () => appJotaiStore.get(currentFolderIdAtom),
@@ -53,5 +56,6 @@ export const useBoardsState = () => {
     boardData: useAtomValue(boardDataAtom),
     ready: useAtomValue(boardsReadyAtom),
     navigationHistory: useAtomValue(navigationHistoryAtom),
+    graphVersion: useAtomValue(graphVersionAtom),
   };
 };

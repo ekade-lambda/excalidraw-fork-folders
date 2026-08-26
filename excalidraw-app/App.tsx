@@ -159,6 +159,7 @@ import { handleOnCopy } from "./boards/host/copy";
 import { handleOnPaste } from "./boards/host/paste";
 
 import { initializeBoardSystem } from "./boards/host/boardService";
+import { startMultiTabSync } from "./boards/host/reconciliation";
 import { LocalStorageBoardRepository } from "./boards/repository/LocalStorageBoardRepository";
 import { createFolder } from "./boards/host/folderService";
 import { boardsStoreActions } from "./boards/host/boardState";
@@ -505,9 +506,11 @@ const ExcalidrawWrapper = () => {
     if (!excalidrawAPI) {
       return;
     }
-    initializeBoardSystem(new LocalStorageBoardRepository()).catch((error) => {
+    const repo = new LocalStorageBoardRepository();
+    initializeBoardSystem(repo).catch((error) => {
       console.error("BoardSystem: boot failed", error);
     });
+    return startMultiTabSync(repo, excalidrawAPI);
   }, [excalidrawAPI]);
 
   const [pointerPickerPos, setPointerPickerPos] = useState<{
