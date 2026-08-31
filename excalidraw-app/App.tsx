@@ -177,6 +177,9 @@ import {
   LinkToFileToolButton,
 } from "./boards/link-to-file/ui/LinkToFileToolButton";
 import { createLinkToFile } from "./boards/link-to-file/host/createLinkToFile";
+import { openLinkToFile } from "./boards/link-to-file/host/openLinkToFile";
+import { hitTestLinkToFileAtPoint } from "./boards/link-to-file/host/hitTestLinkToFile";
+import { getCustomToolExecutionPlan } from "./boards/host/customToolsDispatcher";
 import { NavBar } from "./boards/ui/NavBar";
 import { PickerFolderDialog } from "./boards/ui/PickerFolderDialog";
 import { createPointerInCanvas } from "./boards/host/pointerService";
@@ -550,7 +553,9 @@ const ExcalidrawWrapper = () => {
         }
 
         const parentFolderId = boardsStoreActions.getCurrentFolderId();
-        if (!parentFolderId) {
+        const plan = getCustomToolExecutionPlan(activeTool.customType, parentFolderId);
+
+        if (plan === "NONE") {
           return;
         }
 
@@ -560,20 +565,19 @@ const ExcalidrawWrapper = () => {
           excalidrawAPI.getAppState(),
         );
 
-        if (activeTool.customType === FOLDER_TOOL_CUSTOM_TYPE) {
+        if (plan === "CREATE_FOLDER") {
           createFolder({
             repo: new LocalStorageBoardRepository(),
             excalidrawAPI,
-            parentFolderId,
-
+            parentFolderId: parentFolderId as string,
             sceneX,
             sceneY,
           }).catch((error) => {
             console.error("BoardSystem: create folder failed", error);
           });
-        } else if (activeTool.customType === FOLDER_POINTER_TOOL_CUSTOM_TYPE) {
+        } else if (plan === "SET_POINTER_POS") {
           setPointerPickerPos({ sceneX, sceneY });
-        } else if (activeTool.customType === LINK_TO_FILE_TOOL_CUSTOM_TYPE) {
+        } else if (plan === "CREATE_LINK_TO_FILE") {
           createLinkToFile({ excalidrawAPI, sceneX, sceneY })
             .then(() => {
               excalidrawAPI.setActiveTool({ type: "selection" });
@@ -719,6 +723,28 @@ const ExcalidrawWrapper = () => {
       }).catch((e) => console.error("Rename failed", e));
     }
     setRenameCtx(null);
+  };
+
+  const handleCanvasDoubleClickCapture = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!excalidrawAPI) {
+      return;
+    }
+    const { x, y } = viewportCoordsToSceneCoords(
+      { clientX: event.clientX, clientY: event.clientY },
+      excalidrawAPI.getAppState(),
+    );
+    const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
+    
+    // Fase 6: Link to File intercept (evita que el double click llegue a Excalidraw)
+    const linkHit = hitTestLinkToFileAtPoint(elements, { x, y });
+    if (linkHit.hit && linkHit.element && linkHit.linkData) {
+      event.stopPropagation();
+      void openLinkToFile({
+        excalidrawAPI,
+        element: linkHit.element,
+        linkData: linkHit.linkData,
+      });
+    }
   };
 
   const handleCanvasDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -1261,6 +1287,7 @@ const ExcalidrawWrapper = () => {
       className={clsx("excalidraw-app", {
         "is-collaborating": isCollaborating,
       })}
+      onDoubleClickCapture={handleCanvasDoubleClickCapture}
       onDoubleClick={handleCanvasDoubleClick}
       onContextMenu={handleHostContextMenu}
     >
