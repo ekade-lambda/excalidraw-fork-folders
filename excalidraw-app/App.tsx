@@ -608,62 +608,84 @@ const ExcalidrawWrapper = () => {
     editing?: boolean;
   } | null>(null);
 
-  // Global click-outside detector for Rename UI
+  // Global click-outside detector for Context Menus
   useEffect(() => {
-    if (!renameCtx) {
+    if (!renameCtx && !linkToFileCtx) {
       return;
     }
 
     const handleGlobalPointerDown = (e: PointerEvent) => {
       const target = e.target as Node;
       const renameElement = document.querySelector(".board-rename-ui");
+      const linkToFileElement = document.querySelector(".link-to-file-ui");
 
       if (renameElement && renameElement.contains(target)) {
-        // Clicked inside Rename UI, do nothing
+        return;
+      }
+      if (linkToFileElement && linkToFileElement.contains(target)) {
         return;
       }
 
-      // Clicked outside, close Rename
       setRenameCtx(null);
       setLinkToFileCtx(null);
     };
 
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setRenameCtx(null);
+        setLinkToFileCtx(null);
+      }
+    };
+
     document.addEventListener("pointerdown", handleGlobalPointerDown, true);
+    document.addEventListener("keydown", handleGlobalKeyDown, true);
     return () => {
       document.removeEventListener(
         "pointerdown",
         handleGlobalPointerDown,
         true,
       );
+      document.removeEventListener(
+        "keydown",
+        handleGlobalKeyDown,
+        true,
+      );
     };
-  }, [renameCtx]);
+  }, [renameCtx, linkToFileCtx]);
 
   // Positioning loop (visual only, NO lifecycle control)
   useEffect(() => {
-    if (!renameCtx) {
+    if (!renameCtx && !linkToFileCtx) {
       return;
     }
 
     let rafId: number;
     const syncPosition = () => {
-      const menuElement = document.querySelector(
-        ".context-menu",
-      ) as HTMLElement | null;
-      const renameElement = document.querySelector(
-        ".board-rename-ui",
-      ) as HTMLElement | null;
+      const menuElement = document.querySelector(".context-menu") as HTMLElement | null;
+      const renameElement = document.querySelector(".board-rename-ui") as HTMLElement | null;
+      const linkToFileElement = document.querySelector(".link-to-file-ui") as HTMLElement | null;
 
-      if (menuElement && renameElement) {
+      if (menuElement) {
         const menuRect = menuElement.getBoundingClientRect();
-        renameElement.style.left = `${menuRect.right}px`;
-        renameElement.style.top = `${menuRect.top}px`;
-        renameElement.style.transform = `none`;
+        
+        if (renameElement) {
+          renameElement.style.left = `${menuRect.right}px`;
+          renameElement.style.top = `${menuRect.top}px`;
+          renameElement.style.transform = `none`;
+        }
+        if (linkToFileElement) {
+          linkToFileElement.style.left = `${menuRect.right}px`;
+          linkToFileElement.style.top = `${menuRect.top}px`;
+          linkToFileElement.style.transform = `none`;
+        }
       }
       rafId = requestAnimationFrame(syncPosition);
     };
     rafId = requestAnimationFrame(syncPosition);
     return () => cancelAnimationFrame(rafId);
-  }, [renameCtx]);
+  }, [renameCtx, linkToFileCtx]);
+
+
 
   const handleHostContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!excalidrawAPI) {
@@ -1817,3 +1839,7 @@ const ExcalidrawApp = () => {
 };
 
 export default ExcalidrawApp;
+
+
+
+
