@@ -33,9 +33,14 @@ export const PickerFolderDialog = ({
   }
 
   // Obtenemos todos los folders ordenados (excluimos pointers, por definicion graph.folders solo tiene carpetas reales)
-  const folders = Object.values(graph.folders).sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
+  const folders = Object.values(graph.folders).sort((a, b) => {
+    // 1. Cronológico descendente por fecha de creación (más nuevos primero)
+    if (b.createdAt !== a.createdAt) {
+      return b.createdAt - a.createdAt;
+    }
+    // 2. Criterio secundario: alfabético
+    return a.name.localeCompare(b.name);
+  });
 
   return (
     <Dialog
