@@ -172,6 +172,11 @@ import {
   FolderToolButton,
   FolderPointerToolButton,
 } from "./boards/ui/ToolButtons";
+import {
+  LINK_TO_FILE_TOOL_CUSTOM_TYPE,
+  LinkToFileToolButton,
+} from "./boards/link-to-file/ui/LinkToFileToolButton";
+import { createLinkToFile } from "./boards/link-to-file/host/createLinkToFile";
 import { NavBar } from "./boards/ui/NavBar";
 import { PickerFolderDialog } from "./boards/ui/PickerFolderDialog";
 import { createPointerInCanvas } from "./boards/host/pointerService";
@@ -568,6 +573,17 @@ const ExcalidrawWrapper = () => {
           });
         } else if (activeTool.customType === FOLDER_POINTER_TOOL_CUSTOM_TYPE) {
           setPointerPickerPos({ sceneX, sceneY });
+        } else if (activeTool.customType === LINK_TO_FILE_TOOL_CUSTOM_TYPE) {
+          createLinkToFile({ excalidrawAPI, sceneX, sceneY })
+            .then(() => {
+              excalidrawAPI.setActiveTool({ type: "selection" });
+            })
+            .catch((error) => {
+              if (error.name !== "BridgeError" || error.code !== "Cancelled") {
+                console.error("Link to File: create failed", error);
+              }
+              excalidrawAPI.setActiveTool({ type: "selection" });
+            });
         }
       },
     );
@@ -1313,6 +1329,7 @@ const ExcalidrawWrapper = () => {
             >
               <FolderToolButton excalidrawAPI={excalidrawAPI} />
               <FolderPointerToolButton excalidrawAPI={excalidrawAPI} />
+              <LinkToFileToolButton excalidrawAPI={excalidrawAPI} />
               <NavBar repo={boardRepo} excalidrawAPI={excalidrawAPI} />
             </div>
           );
