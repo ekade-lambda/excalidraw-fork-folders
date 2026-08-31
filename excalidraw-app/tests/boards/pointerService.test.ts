@@ -85,9 +85,13 @@ describe("pointerService", () => {
 
     expect(pointer).toBeDefined();
     expect(pointer.targetFolderId).toBe(newFolder!.id);
-    expect(pointer.name).toBe("MyPointer");
+    expect(pointer.name).toBe("TargetFolder");
 
     // Check elements
+    const textEl = elements.find((e) => e.type === "text" && e.text === "↗ TargetFolder");
+    expect(textEl).toBeDefined();
+    expect(textEl.customData.folderBoard.kind).toBe("pointer");
+
     const primary = elements.find(
       (el) =>
         el.customData?.folderBoard?.kind === "pointer" &&
@@ -101,6 +105,7 @@ describe("pointerService", () => {
 
     expect(primary).toBeDefined();
     expect(text).toBeDefined();
-    expect(text.text).toBe("↗ MyPointer");
+    expect(text.text).toBe("↗ TargetFolder");
   });
 });
+

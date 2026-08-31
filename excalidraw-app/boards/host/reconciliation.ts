@@ -1,4 +1,4 @@
-import type { ExcalidrawElement } from "@excalidraw/element/types";
+﻿import type { ExcalidrawElement } from "@excalidraw/element/types";
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
@@ -124,6 +124,43 @@ export function syncStructuralElements(
     }
   }
 
+  for (let i = 0; i < nextElements.length; i++) {
+    const el = nextElements[i];
+    const meta = (el.customData as any)?.folderBoard as
+      | FolderBoardVisualMeta
+      | undefined;
+    if (meta?.role === "text") {
+      if (meta.kind === "folder") {
+        const folder = graph.folders[meta.folderId];
+        if (folder && (el as any).text !== folder.name) {
+          nextElements[i] = {
+            ...el,
+            text: folder.name,
+            originalText: folder.name,
+            width: Math.max(120, folder.name.length * 10),
+          } as unknown as ExcalidrawElement;
+          didChange = true;
+        }
+      } else if (meta.kind === "pointer") {
+        const targetFolder = graph.folders[meta.targetFolderId];
+        if (targetFolder) {
+          const expectedName = targetFolder.name.startsWith("↗")
+            ? targetFolder.name
+            : `↗ ${targetFolder.name}`;
+          if ((el as any).text !== expectedName) {
+            nextElements[i] = {
+              ...el,
+              text: expectedName,
+              originalText: expectedName,
+              width: Math.max(120, expectedName.length * 10),
+            } as unknown as ExcalidrawElement;
+            didChange = true;
+          }
+        }
+      }
+    }
+  }
+
   return { elements: nextElements, didChange };
 }
 
@@ -210,3 +247,25 @@ export function startMultiTabSync(
     window.removeEventListener("storage", handler);
   };
 }
+import { CaptureUpdateAction } from "@excalidraw/excalidraw";
+
+export function reconcilePointerNamesInEditor(
+  graph: BoardsGraph,
+  excalidrawAPI: ExcalidrawImperativeAPI
+) {
+  const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
+  const { elements: next, didChange } = syncStructuralElements(
+    graph,
+    elements as unknown as ExcalidrawElement[],
+    boardsStoreActions.getCurrentBoardId() || "",
+    elements as unknown as ExcalidrawElement[]
+  );
+  if (didChange) {
+    excalidrawAPI.updateScene({
+      elements: next,
+      captureUpdate: CaptureUpdateAction.NEVER,
+    });
+  }
+}
+
+

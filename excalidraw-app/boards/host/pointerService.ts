@@ -36,9 +36,14 @@ export async function createPointerInCanvas(opts: {
     throw new Error("No graph available");
   }
 
+  const targetFolder = graph.folders[opts.targetFolderId];
+  if (!targetFolder) {
+    throw new Error("Target folder not found in graph");
+  }
+
   const result = createPointer(graph, {
     targetFolderId: opts.targetFolderId,
-    name: opts.name,
+    name: targetFolder.name, // ENFORCE SINGLE SOURCE OF TRUTH
   });
 
   if (!result.ok) {
@@ -53,7 +58,7 @@ export async function createPointerInCanvas(opts: {
     pointerId: result.pointer.id,
     targetFolderId: opts.targetFolderId,
     boardId: currentBoardId,
-    name: opts.name,
+    name: targetFolder.name, // ENFORCE SINGLE SOURCE OF TRUTH
     sceneX: opts.sceneX,
     sceneY: opts.sceneY,
   });

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Board System — host / folderService (Fase 3).
  *
  * Orquesta la creación de una folder visual:
@@ -159,22 +159,35 @@ export async function renameFolder(opts: {
 
   // 2. Locate text element in currently active scene and update it visually
   const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
-  const folderVisual = findFolderVisual(elements, folderId);
+  let changed = false;
 
-  if (folderVisual && folderVisual.text) {
-    const textEl = folderVisual.text as ExcalidrawTextElement;
-    // Classic mutation pattern in Excalidraw
-    const mutated = {
-      ...textEl,
-      text: newName,
-      originalText: newName,
-      width: Math.max(120, newName.length * 10), // Aprox resizing
-    };
+  const nextElements = elements.map((e) => {
+    const meta = e.customData?.folderBoard as any;
+    if (meta && meta.role === "text") {
+      if (meta.kind === "folder" && meta.folderId === folderId) {
+        changed = true;
+        return {
+          ...e,
+          text: newName,
+          originalText: newName,
+          width: Math.max(120, newName.length * 10),
+        } as unknown as ExcalidrawTextElement;
+      }
+      if (meta.kind === "pointer" && meta.targetFolderId === folderId) {
+        changed = true;
+        const pName = newName.startsWith("↗") ? newName : `↗ ${newName}`;
+        return {
+          ...e,
+          text: pName,
+          originalText: pName,
+          width: Math.max(120, pName.length * 10),
+        } as unknown as ExcalidrawTextElement;
+      }
+    }
+    return e;
+  });
 
-    const nextElements = elements.map((e) =>
-      e.id === textEl.id ? mutated : e,
-    );
-
+  if (changed) {
     // Use CaptureUpdateAction.NEVER so it avoids diverging if user calls Undo
     excalidrawAPI.updateScene({
       elements: nextElements,
@@ -232,3 +245,4 @@ export async function deleteFolder(opts: {
 
   return { ok: true };
 }
+

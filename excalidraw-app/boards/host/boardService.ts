@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Board System — host / boardService (Fase 2).
  *
  * ORQUESTA el boot del Board System y expone stubs mínimos de integración con
@@ -292,6 +292,28 @@ async function openFolderInternal(opts: {
     boardData = buildBoardData(boardId, folder.name, []);
   }
 
+  // RECONCILE POINTER NAMES WITH DOMAIN GRAPH
+  boardData.elements = boardData.elements.map((e) => {
+    const meta = e.customData?.folderBoard as any;
+    if (meta?.role === "text" && meta.kind === "pointer") {
+      const targetFolder = graph.folders[meta.targetFolderId];
+      if (targetFolder) {
+        const expectedName = targetFolder.name.startsWith("↗")
+          ? targetFolder.name
+          : `↗ ${targetFolder.name}`;
+        if ((e as any).text !== expectedName) {
+          return {
+            ...e,
+            text: expectedName,
+            originalText: expectedName,
+            width: Math.max(120, expectedName.length * 10),
+          } as unknown as ExcalidrawElement;
+        }
+      }
+    }
+    return e;
+  });
+
   // 5. Vuelcar al editor (escena + files + viewport).
   loadBoardIntoEditor(excalidrawAPI, boardData);
 
@@ -411,3 +433,4 @@ export async function navigateToBreadcrumb(opts: {
   // Es una navegación nueva (como abrir una folder), así que registra historial.
   return openFolder(opts);
 }
+

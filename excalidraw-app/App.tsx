@@ -516,9 +516,17 @@ const ExcalidrawWrapper = () => {
       return;
     }
     const repo = new LocalStorageBoardRepository();
-    initializeBoardSystem(repo).catch((error) => {
-      console.error("BoardSystem: boot failed", error);
-    });
+    initializeBoardSystem(repo)
+      .then((bootResult) => {
+        if (bootResult && excalidrawAPI) {
+          import("./boards/host/reconciliation").then((m) => {
+            m.reconcilePointerNamesInEditor(bootResult.graph, excalidrawAPI);
+          });
+        }
+      })
+      .catch((error) => {
+        console.error("BoardSystem: boot failed", error);
+      });
 
     const gcTimer = setTimeout(() => {
       repo.load().then((graph) => {
@@ -700,14 +708,14 @@ const ExcalidrawWrapper = () => {
     const hit = hitTestFolderAtPoint(elements, { x: sceneX, y: sceneY });
     const linkHit = hitTestLinkToFileAtPoint(elements, { x: sceneX, y: sceneY });
 
-    if (hit.kind !== "none") {
-      const fId = hit.kind === "folder" ? hit.folderId : hit.targetFolderId;
+    if (hit.kind === "folder") {
+      const fId = hit.folderId;
       let initialName = "";
       for (const el of elements) {
         const m = el.customData?.folderBoard;
         if (
           m &&
-          (m.folderId === fId || m.targetFolderId === fId) &&
+          m.folderId === fId &&
           m.role === "text"
         ) {
           initialName = (el as any).text || "";
