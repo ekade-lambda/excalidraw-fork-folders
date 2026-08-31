@@ -23,6 +23,11 @@ export interface LinkedFileMetadata {
   creationTime?: string;
 }
 
+export interface LinkToFileVisualData {
+  displayName?: string;
+  customImageFileId?: string; // ID of the BinaryFileData in Excalidraw
+}
+
 /**
  * Modelo de datos conceptual para el futuro elemento visual en BoardData.
  * (No se integra todavía con CustomData o ExcalidrawElement en esta fase).
@@ -33,6 +38,7 @@ export interface LinkToFileData {
   lastKnownPath: string;
   metadata: LinkedFileMetadata;
   role?: "background" | "icon" | "label";
+  visual?: LinkToFileVisualData;
 }
 
 /**

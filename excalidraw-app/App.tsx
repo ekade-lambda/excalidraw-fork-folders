@@ -179,6 +179,7 @@ import {
 import { createLinkToFile } from "./boards/link-to-file/host/createLinkToFile";
 import { openLinkToFile } from "./boards/link-to-file/host/openLinkToFile";
 import { hitTestLinkToFileAtPoint } from "./boards/link-to-file/host/hitTestLinkToFile";
+import { LinkToFileContextMenu, type LinkToFileCtx } from "./boards/link-to-file/ui/LinkToFileContextMenu";
 import { getCustomToolExecutionPlan } from "./boards/host/customToolsDispatcher";
 import { NavBar } from "./boards/ui/NavBar";
 import { PickerFolderDialog } from "./boards/ui/PickerFolderDialog";
@@ -598,6 +599,7 @@ const ExcalidrawWrapper = () => {
   // de una Folder o Pointer, abre su Board correspondiente.
 
   // State for Problem 3 (Rename Folder)
+  const [linkToFileCtx, setLinkToFileCtx] = useState<LinkToFileCtx | null>(null);
   const [renameCtx, setRenameCtx] = useState<{
     folderId: string;
     initialName: string;
@@ -623,6 +625,7 @@ const ExcalidrawWrapper = () => {
 
       // Clicked outside, close Rename
       setRenameCtx(null);
+      setLinkToFileCtx(null);
     };
 
     document.addEventListener("pointerdown", handleGlobalPointerDown, true);
@@ -673,6 +676,7 @@ const ExcalidrawWrapper = () => {
     );
     const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
     const hit = hitTestFolderAtPoint(elements, { x: sceneX, y: sceneY });
+    const linkHit = hitTestLinkToFileAtPoint(elements, { x: sceneX, y: sceneY });
 
     if (hit.kind !== "none") {
       const fId = hit.kind === "folder" ? hit.folderId : hit.targetFolderId;
@@ -689,16 +693,24 @@ const ExcalidrawWrapper = () => {
         }
       }
 
-      // It's a folder or pointer, but DO NOT intercept native menu to preserve it
-
       setRenameCtx({
         folderId: fId,
         initialName,
         x: clientX,
         y: clientY,
       });
+      setLinkToFileCtx(null);
+    } else if (linkHit.hit && linkHit.element && linkHit.linkData) {
+      setLinkToFileCtx({
+        element: linkHit.element,
+        linkData: linkHit.linkData,
+        x: clientX,
+        y: clientY,
+      });
+      setRenameCtx(null);
     } else {
       setRenameCtx(null);
+      setLinkToFileCtx(null);
     }
   };
 
@@ -1663,6 +1675,14 @@ const ExcalidrawWrapper = () => {
             appState={excalidrawAPI.getAppState()}
             scale={window.devicePixelRatio}
             ref={debugCanvasRef}
+          />
+        )}
+
+        {linkToFileCtx && (
+          <LinkToFileContextMenu
+            ctx={linkToFileCtx}
+            excalidrawAPI={excalidrawAPI!}
+            onClose={() => setLinkToFileCtx(null)}
           />
         )}
 
