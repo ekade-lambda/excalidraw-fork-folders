@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Tipos de dominio para el subsistema Link to File.
  */
 
@@ -32,6 +32,7 @@ export interface LinkToFileData {
   fileIdentity: FileIdentity;
   lastKnownPath: string;
   metadata: LinkedFileMetadata;
+  role?: "background" | "icon" | "label";
 }
 
 /**

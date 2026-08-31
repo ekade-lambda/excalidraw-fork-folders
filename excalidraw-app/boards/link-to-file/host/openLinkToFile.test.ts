@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { openLinkToFile } from "./openLinkToFile";
 import { resolveFile, openFile } from "../bridgeClient";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
@@ -21,6 +21,7 @@ describe("openLinkToFile", () => {
     customData: {
       type: "link-to-file",
       lastKnownPath: "C:\\doc.txt",
+      fileIdentity: { volumeGuid: "VOL1", fileId: [1, 2, 3] },
     }
   } as unknown as ExcalidrawElement;
 
@@ -71,6 +72,28 @@ describe("openLinkToFile", () => {
     
     // Debería pasar la ruta actualizada a openFile
     expect(openFile).toHaveBeenCalledWith(dummyLinkData.fileIdentity, "C:\\new_folder\\doc.txt");
+  });
+
+  it("updates lastKnownPath for all elements belonging to the same File Card", async () => {
+    const el2 = {
+      ...dummyElement,
+      id: "el-2",
+      type: "rectangle",
+    };
+    getSceneElementsMock.mockReturnValueOnce([dummyElement, el2]);
+
+    vi.mocked(resolveFile).mockResolvedValueOnce({
+      status: "resolved",
+      currentPath: "C:\\new_folder\\doc.txt",
+    });
+    vi.mocked(openFile).mockResolvedValueOnce();
+
+    await openLinkToFile({ excalidrawAPI, element: dummyElement, linkData: dummyLinkData });
+
+    expect(updateSceneMock).toHaveBeenCalled();
+    const updatedElements = updateSceneMock.mock.calls[0][0].elements;
+    expect(updatedElements[0].customData.lastKnownPath).toBe("C:\\new_folder\\doc.txt");
+    expect(updatedElements[1].customData.lastKnownPath).toBe("C:\\new_folder\\doc.txt");
   });
 
   it("handles FileNotFoundBridgeError gracefully without crashing", async () => {

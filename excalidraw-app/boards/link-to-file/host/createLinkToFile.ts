@@ -1,7 +1,7 @@
-﻿import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-import { newTextElement } from "@excalidraw/element";
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { pickFile } from "../bridgeClient";
 import type { LinkToFileData } from "../types";
+import { createFileCardElements } from "../ui/fileCard";
 
 export interface CreateLinkToFileOpts {
   excalidrawAPI: ExcalidrawImperativeAPI;
@@ -33,25 +33,17 @@ export async function createLinkToFile({
     metadata: pickResult.metadata,
   };
 
-  // 3. Representación provisional de Fase 5:
-  // Elegimos un TextElement simple. Esto garantiza que el elemento
-  // sobrevive a Undo/Redo, Copy/Paste y persistencia sin requerir
-  // ninguna modificación a los repositorios ni core de Excalidraw.
-  // En Fase 6 podrá ser reemplazado visualmente sin perder la identidad.
-  const textElement = newTextElement({
-    text: `🔗 ${pickResult.metadata.name}`,
-    x: sceneX,
-    y: sceneY,
-    fontSize: 20,
-    strokeColor: "#228be6", // un color distintivo
+  // 3. Representación visual como un "File Card" (Fase 7)
+  const fileCardElements = createFileCardElements({
+    sceneX,
+    sceneY,
     customData,
   });
 
-  // 4. Inyectamos el elemento en el Canvas actual.
-  // getSceneElements() devuelve todos los elementos activos de la escena.
+  // 4. Inyectamos los elementos en el Canvas actual.
   const currentElements = excalidrawAPI.getSceneElements();
   
   excalidrawAPI.updateScene({
-    elements: [...currentElements, textElement],
+    elements: [...currentElements, ...fileCardElements],
   });
 }

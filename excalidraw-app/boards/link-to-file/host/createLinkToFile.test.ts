@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createLinkToFile } from "./createLinkToFile";
 import { pickFile } from "../bridgeClient";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
@@ -25,7 +25,7 @@ describe("createLinkToFile", () => {
     } as unknown as ExcalidrawImperativeAPI;
   });
 
-  it("creates a text element and updates scene when file is picked", async () => {
+  it("creates a File Card (3 elements) and updates scene when file is picked", async () => {
     vi.mocked(pickFile).mockResolvedValueOnce({
       fileIdentity: { volumeGuid: "VOL1", fileId: [1, 2, 3] },
       lastKnownPath: "C:\\doc.txt",
@@ -40,22 +40,35 @@ describe("createLinkToFile", () => {
 
     const updateArgs = updateSceneMock.mock.calls[0][0];
     const elements = updateArgs.elements;
-    expect(elements).toHaveLength(1);
+    expect(elements).toHaveLength(3); // Background, Icon, Label
 
-    const el = elements[0];
-    expect(el.type).toBe("text");
-    expect(el.text).toBe("🔗 doc.txt");
-    expect(el.x).toBe(100);
-    expect(el.y).toBe(200);
+    const bg = elements[0];
+    const icon = elements[1];
+    const label = elements[2];
 
-    const customData = el.customData;
-    expect(customData).toBeDefined();
-    expect(customData.type).toBe("link-to-file");
-    expect(customData.fileIdentity).toEqual({
+    expect(bg.type).toBe("rectangle");
+    expect(icon.type).toBe("text");
+    expect(label.type).toBe("text");
+
+    expect(icon.text).toBe("📄"); // Icono para .txt
+    expect(label.text).toBe("doc.txt"); // Nombre
+
+    // Tienen el mismo groupId
+    const groupId = bg.groupIds[0];
+    expect(groupId).toBeDefined();
+    expect(icon.groupIds[0]).toBe(groupId);
+    expect(label.groupIds[0]).toBe(groupId);
+
+    // Tienen customData idéntica excepto el role
+    expect(bg.customData.type).toBe("link-to-file");
+    expect(bg.customData.role).toBe("background");
+    expect(icon.customData.role).toBe("icon");
+    expect(label.customData.role).toBe("label");
+
+    expect(bg.customData.fileIdentity).toEqual({
       volumeGuid: "VOL1",
       fileId: [1, 2, 3],
     });
-    expect(customData.metadata.name).toBe("doc.txt");
   });
 
   it("does not update scene if user cancels pickFile", async () => {

@@ -1,4 +1,4 @@
-﻿import type { ExcalidrawElement } from "@excalidraw/element/types";
+import type { ExcalidrawElement } from "@excalidraw/element/types";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { resolveFile, openFile } from "../bridgeClient";
 import type { LinkToFileData } from "../types";
@@ -28,10 +28,15 @@ export async function openLinkToFile({
     if (resolveResult.currentPath && resolveResult.currentPath !== lastKnownPath) {
       const currentElements = excalidrawAPI.getSceneElements();
       
-      // Actualizamos usando el mismo mecanismo que Excalidraw para mutar elementos
-      // No modificamos la identidad
+      // Actualizamos *todos* los elementos que pertenezcan a este Link to File
+      // comprobando la identidad (Volume GUID + File ID)
       const updatedElements = currentElements.map((el) => {
-        if (el.id === element.id) {
+        const cd = el.customData as LinkToFileData | undefined;
+        if (
+          cd?.type === "link-to-file" &&
+          cd.fileIdentity.volumeGuid === linkData.fileIdentity.volumeGuid &&
+          cd.fileIdentity.fileId.join(",") === linkData.fileIdentity.fileId.join(",")
+        ) {
           return {
             ...el,
             customData: {
