@@ -165,7 +165,7 @@ import { createFolder } from "./boards/host/folderService";
 import { boardsStoreActions } from "./boards/host/boardState";
 import { openFolder } from "./boards/host/boardService";
 import { hitTestFolderAtPoint } from "./boards/host/hitTest";
-import { renameFolder } from "./boards/host/folderService";
+import { renameFolder, deleteFolder } from "./boards/host/folderService";
 import {
   FOLDER_TOOL_CUSTOM_TYPE,
   FOLDER_POINTER_TOOL_CUSTOM_TYPE,
@@ -510,7 +510,22 @@ const ExcalidrawWrapper = () => {
     initializeBoardSystem(repo).catch((error) => {
       console.error("BoardSystem: boot failed", error);
     });
-    return startMultiTabSync(repo, excalidrawAPI);
+
+    const gcTimer = setTimeout(() => {
+      repo.load().then((graph) => {
+        if (graph && repo.runGarbageCollector) {
+          repo
+            .runGarbageCollector(graph)
+            .catch((e) => console.error("GC failed", e));
+        }
+      });
+    }, 10000);
+
+    const unsubscribe = startMultiTabSync(repo, excalidrawAPI);
+    return () => {
+      clearTimeout(gcTimer);
+      unsubscribe();
+    };
   }, [excalidrawAPI]);
 
   const [pointerPickerPos, setPointerPickerPos] = useState<{
@@ -665,6 +680,17 @@ const ExcalidrawWrapper = () => {
     } else {
       setRenameCtx(null);
     }
+  };
+
+  const handleDeleteFolder = () => {
+    if (renameCtx && excalidrawAPI) {
+      deleteFolder({
+        repo: boardRepo,
+        excalidrawAPI,
+        folderId: renameCtx.folderId,
+      }).catch((e) => console.error("Delete failed", e));
+    }
+    setRenameCtx(null);
   };
 
   const handleRenameConfirm = (newName: string) => {
@@ -1648,19 +1674,33 @@ const ExcalidrawWrapper = () => {
                 }}
               />
             ) : (
-              <div
-                style={{
-                  padding: "4px 8px",
-                  cursor: "pointer",
-                  fontWeight: "bold",
-                }}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  setRenameCtx({ ...renameCtx, editing: true });
-                }}
-              >
-                Rename
-              </div>
+              <>
+                <div
+                  style={{
+                    padding: "4px 8px",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                  }}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    setRenameCtx({ ...renameCtx, editing: true });
+                  }}
+                >
+                  Rename
+                </div>
+
+                <div
+                  onClick={handleDeleteFolder}
+                  style={{
+                    padding: "4px 8px",
+                    cursor: "pointer",
+                    color: "red",
+                    borderTop: "1px solid #ccc",
+                  }}
+                >
+                  Delete
+                </div>
+              </>
             )}
           </div>
         )}

@@ -1,23 +1,17 @@
 ﻿import os
 
-path = 'excalidraw-app/tests/boards/folderRename.ui.test.tsx'
-with open(path, 'r', encoding='utf-8') as f:
+path = "excalidraw-app/tests/boards/deleteOrchestration.test.ts"
+with open(path, "r", encoding="utf-8") as f:
     content = f.read()
 
-# Modify fireEvent.click to fireEvent.pointerDown
 content = content.replace(
-    'fireEvent.click(screen.getByText("Rename"));',
-    '''
-    // Simulamos pointerDown sobre Rename
-    const renameBtn = screen.getByText("Rename");
-    fireEvent.pointerDown(renameBtn);
-
-    // Simulamos que Excalidraw cierra su context-menu en pointerdown (como lo hace en la realidad)
-    const ctxMenu = document.querySelector(".context-menu");
-    if (ctxMenu) ctxMenu.remove();
-    '''
+    'customData: { type: "board-folder", folderId: (r1 as any).folderId }',
+    'customData: { folderBoard: { kind: "folder", folderId: (r1 as any).folderId } }'
+)
+content = content.replace(
+    'customData: {\n          type: "board-folder-text",\n          folderId: (r1 as any).folderId,\n        }',
+    'customData: {\n          folderBoard: { kind: "text", folderId: (r1 as any).folderId }\n        }'
 )
 
-with open(path, 'w', encoding='utf-8', newline='\n') as f:
+with open(path, "w", encoding="utf-8") as f:
     f.write(content)
-print("Updated UI test!")

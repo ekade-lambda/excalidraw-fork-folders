@@ -1,12 +1,7 @@
 ﻿import os
-path = "excalidraw-app/boards/repository/LocalStorageBoardRepository.ts"
-with open(path, "r", encoding="utf-8") as f:
-    content = f.read()
-
-import_statement = 'import { createStore, get as idbGet, set as idbSet, del as idbDel } from "idb-keyval";\n'
-if "idb-keyval" not in content:
-    content = import_statement + content
-
-with open(path, "w", encoding="utf-8", newline="\n") as f:
-    f.write(content)
-print("Added imports")
+for path in ["excalidraw-app/tests/boards/deleteOrchestration.test.ts", "excalidraw-app/tests/boards/gc.test.ts"]:
+    with open(path, "r", encoding="utf-8") as f:
+        content = f.read()
+    content = content.replace("../../../app_constants", "../../app_constants")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
