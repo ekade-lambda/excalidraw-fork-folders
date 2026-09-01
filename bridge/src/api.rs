@@ -250,10 +250,11 @@ pub async fn post_graph(State(state): State<Arc<AppState>>, Json(graph): Json<Bo
     }
 
     for (id, board) in &graph.boards {
+        let f_id = if board.root_folder_id.is_empty() { None } else { Some(board.root_folder_id.clone()) };
         transaction.execute(
             "UPDATE excalidraw.boards SET folder_id = $1 WHERE id = $2",
-            &[&board.root_folder_id, &id]
-        ).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            &[&f_id, &id]
+        ).await.map_err(|e| { println!("Error in board: {:?}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
     }
 
     transaction.commit().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

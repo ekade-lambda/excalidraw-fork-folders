@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Board System — host / boardService (Fase 2).
  *
  * ORQUESTA el boot del Board System y expone stubs mínimos de integración con
@@ -238,6 +238,8 @@ export async function saveCurrentBoard(
   repo: BoardRepository,
   boardId: BoardId,
 ): Promise<void> {
+  const currentName = excalidrawAPI.getName();
+  
   const data: BoardData = {
     schemaVersion: BOARD_SYSTEM_SCHEMA_VERSION,
     boardId,
@@ -245,10 +247,32 @@ export async function saveCurrentBoard(
       excalidrawAPI.getSceneElementsIncludingDeleted() as unknown as ExcalidrawElement[],
     files: excalidrawAPI.getFiles(),
     viewport: null,
-    name: excalidrawAPI.getName(),
+    name: currentName,
     updatedAt: Date.now(),
   };
+  
+  // 1. Guardar la data del Board
   await repo.saveBoard(data);
+
+  // 2. Fase 7: Sincronizar el nombre del Board con el Folder subyacente
+  const folderId = boardsStoreActions.getCurrentFolderId();
+  if (folderId) {
+    const graph = await repo.load();
+    if (graph) {
+      const folder = graph.folders[folderId];
+      if (folder && folder.name !== currentName) {
+        // Renombrar el folder estructuralmente
+        folder.name = currentName;
+        // Tambien renombrar cualquier pointer que apunte a este folder
+        for (const pointer of Object.values(graph.pointers)) {
+          if (pointer.targetFolderId === folderId && pointer.name !== currentName) {
+             pointer.name = currentName;
+          }
+        }
+        await repo.save(graph);
+      }
+    }
+  }
 }
 
 /**
