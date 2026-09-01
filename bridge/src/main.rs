@@ -1,7 +1,7 @@
 use axum::{
     extract::{Json, State},
     http::{Method, StatusCode},
-    routing::{get, post},
+    routing::{delete, get, post},
     Router,
 };
 use serde::{Deserialize, Serialize};
@@ -28,6 +28,8 @@ struct HealthResponse {
 struct AppState {
     db_pool: Option<Pool>,
 }
+
+mod api;
 
 #[derive(Serialize)]
 struct FileIdentityDto {
@@ -107,6 +109,10 @@ async fn main() {
         .route("/pick-file", get(pick_file_handler))
         .route("/resolve", post(resolve_handler))
         .route("/open", post(open_handler))
+        .route("/api/graph", get(api::get_graph).post(api::post_graph))
+        .route("/api/boards/:id", get(api::get_board).post(api::post_board).delete(api::delete_board))
+        .route("/api/transaction/apply", post(api::apply_transaction))
+        .route("/api/boards/clone", post(api::clone_boards))
         .layer(cors)
         .with_state(shared_state);
 

@@ -20,6 +20,7 @@ pub async fn run_migrations(client: &mut tokio_postgres::Client) -> Result<(), B
     // Definimos las migraciones ordenadas
     let migrations = vec![
         (1, include_str!("migrations/001_initial.sql")),
+        (2, include_str!("migrations/002_fase4_expansion.sql")),
     ];
 
     // Aplicamos las pendientes
