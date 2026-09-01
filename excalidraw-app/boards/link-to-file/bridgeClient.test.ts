@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   checkBridgeHealth,
   pickFile,
@@ -25,29 +25,33 @@ describe("bridgeClient", () => {
   });
 
   describe("checkBridgeHealth", () => {
-    it("returns true when bridge is up and responds ok", async () => {
+    it("returns health struct true when fetch succeeds and status is ok", async () => {
       vi.mocked(global.fetch).mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ status: "ok" }),
+        json: async () => ({ status: "ok", db_connected: true }),
       } as Response);
 
       const result = await checkBridgeHealth();
-      expect(result).toBe(true);
+      expect(result.ok).toBe(true);
+      expect(result.dbConnected).toBe(true);
     });
 
-    it("returns false when bridge responds with non-ok", async () => {
+    it("returns health struct false when fetch fails with not ok", async () => {
       vi.mocked(global.fetch).mockResolvedValueOnce({
         ok: false,
       } as Response);
 
       const result = await checkBridgeHealth();
-      expect(result).toBe(false);
+      expect(result.ok).toBe(false);
+      expect(result.dbConnected).toBe(false);
     });
 
-    it("returns false when fetch throws (bridge down)", async () => {
-      vi.mocked(global.fetch).mockRejectedValueOnce(new Error("Network Error"));
+    it("returns health struct false when fetch throws error (network error)", async () => {
+      vi.mocked(global.fetch).mockRejectedValueOnce(new Error("Network fail"));
+
       const result = await checkBridgeHealth();
-      expect(result).toBe(false);
+      expect(result.ok).toBe(false);
+      expect(result.dbConnected).toBe(false);
     });
   });
 

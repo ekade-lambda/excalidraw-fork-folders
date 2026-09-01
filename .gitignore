@@ -27,3 +27,7 @@ dev-dist
 html
 meta*.json
 .claude
+
+# Local env files
+.env
+bridge/.env

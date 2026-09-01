@@ -1,5 +1,5 @@
-﻿use axum::{
-    extract::Json,
+use axum::{
+    extract::{Json, State},
     http::{Method, StatusCode},
     routing::{get, post},
     Router,
@@ -8,15 +8,24 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use tower_http::cors::{Any, CorsLayer};
+use std::sync::Arc;
+use deadpool_postgres::Pool;
 
 mod identity;
 mod dialogs;
 mod shell;
+mod db;
 
 #[derive(Serialize)]
 struct HealthResponse {
     status: String,
     version: String,
+    db_connected: bool,
+    db_error: Option<String>,
+}
+
+struct AppState {
+    db_pool: Option<Pool>,
 }
 
 #[derive(Serialize)]
@@ -55,6 +64,25 @@ struct ResolveResponse {
 
 #[tokio::main]
 async fn main() {
+    // Intenta cargar .env desde el directorio actual, y si no est, busca explcitamente en ./bridge/.env
+    // Esto hace que el comando funcione tanto si se ejecuta `cargo run` desde /bridge como desde la raz del monorepo
+    if let Err(_) = dotenvy::dotenv() {
+        let _ = dotenvy::from_path(Path::new("./bridge/.env"));
+    }
+
+    let db_pool = match db::create_pool() {
+        Ok(pool) => {
+            println!("PostgreSQL pool creado exitosamente.");
+            Some(pool)
+        }
+        Err(e) => {
+            println!("Advertencia: No se pudo crear el pool de PostgreSQL: {}", e);
+            None
+        }
+    };
+
+    let shared_state = Arc::new(AppState { db_pool });
+
     let cors = CorsLayer::new()
         // Allow local dev origin. For safety, we only allow localhost origins.
         .allow_origin(Any) // In a real app we'd restrict to http://localhost:5173
@@ -66,7 +94,8 @@ async fn main() {
         .route("/pick-file", get(pick_file_handler))
         .route("/resolve", post(resolve_handler))
         .route("/open", post(open_handler))
-        .layer(cors);
+        .layer(cors)
+        .with_state(shared_state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3005));
     println!("Bridge listening on {}", addr);
@@ -74,10 +103,28 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn health_handler() -> Json<HealthResponse> {
+async fn health_handler(State(state): State<Arc<AppState>>) -> Json<HealthResponse> {
+    let (db_connected, db_error) = match &state.db_pool {
+        Some(pool) => {
+            // Intenta obtener una conexin y hacer un query bsico
+            match pool.get().await {
+                Ok(client) => {
+                    match client.query_one("SELECT 1", &[]).await {
+                        Ok(_) => (true, None),
+                        Err(e) => (false, Some(format!("Error ejecutando query: {}", e))),
+                    }
+                }
+                Err(e) => (false, Some(format!("Error obteniendo conexin: {}", e))),
+            }
+        }
+        None => (false, Some("PostgreSQL no est configurado o no se pudo inicializar el pool.".to_string())),
+    };
+
     Json(HealthResponse {
         status: "ok".to_string(),
         version: "0.1.0".to_string(),
+        db_connected,
+        db_error,
     })
 }
 

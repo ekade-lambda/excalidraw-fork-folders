@@ -1,4 +1,4 @@
-﻿import {
+import {
   BridgeUnavailableError,
   CancelledBridgeError,
   FileIdentity,
@@ -20,17 +20,30 @@ export interface ResolveFileResult {
   currentPath: string;
 }
 
+export interface BridgeHealth {
+  ok: boolean;
+  dbConnected: boolean;
+  dbError?: string;
+}
+
 /**
  * Verifica si el Bridge está vivo y responde en 127.0.0.1:3005
+ * Ahora también devuelve el estado de la conexión a PostgreSQL.
  */
-export async function checkBridgeHealth(): Promise<boolean> {
+export async function checkBridgeHealth(): Promise<BridgeHealth> {
   try {
     const res = await fetch(`${BRIDGE_URL}/health`, { method: "GET" });
-    if (!res.ok) return false;
+    if (!res.ok) {
+      return { ok: false, dbConnected: false };
+    }
     const data = await res.json();
-    return data.status === "ok";
+    return {
+      ok: data.status === "ok",
+      dbConnected: !!data.db_connected,
+      dbError: data.db_error,
+    };
   } catch (e) {
-    return false;
+    return { ok: false, dbConnected: false };
   }
 }
 
