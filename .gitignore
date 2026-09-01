@@ -31,3 +31,4 @@ meta*.json
 # Local env files
 .env
 bridge/.env
+bridge/target/

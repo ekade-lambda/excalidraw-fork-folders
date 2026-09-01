@@ -1,1 +1,0 @@
-C:\Users\ekade\Desktop\EKADE\PROYECTOS\PAGINAS-WEB\NEW-AGE\notas\Agosto-2026-Excalidraw\excalidraw-fork-folders\bridge\target\debug\test_dialog.exe: C:\Users\ekade\Desktop\EKADE\PROYECTOS\PAGINAS-WEB\NEW-AGE\notas\Agosto-2026-Excalidraw\excalidraw-fork-folders\bridge\src\bin\test_dialog.rs

@@ -54,7 +54,7 @@ describe('Fase 10 - Restore', () => {
     // 3. Ejecutar Restore usando el ZIP de A
     const resRestore = await fetch('http://127.0.0.1:3005/api/restore', {
       method: 'POST',
-      body: backupZipBytes
+      body: backupZipBytes as unknown as BodyInit
     });
     const restoreResult = await resRestore.json();
     expect(resRestore.ok).toBe(true);
@@ -65,8 +65,9 @@ describe('Fase 10 - Restore', () => {
     expect(fs.existsSync(path.join(BACKUPS_DIR, restoreResult.safety_backup))).toBe(true);
     
     // 4. Verificar que se cargó el workspace A
-    const boardJson = await repo.load();
-    const parsed = JSON.parse(boardJson);
+    const boardGraph = await repo.load();
+    expect(boardGraph).not.toBeNull();
+    const parsed = boardGraph as any;
     expect(parsed.elements[0].id).toBe('boardA');
     expect(parsed.files['fileA']).toBeDefined();
   });
@@ -75,7 +76,7 @@ describe('Fase 10 - Restore', () => {
     const randomBytes = new Uint8Array([0, 1, 2, 3, 4, 5, 6]);
     const res = await fetch('http://127.0.0.1:3005/api/restore', {
       method: 'POST',
-      body: randomBytes
+      body: randomBytes as unknown as BodyInit
     });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(400); // BAD_REQUEST
@@ -90,7 +91,7 @@ describe('Fase 10 - Restore', () => {
       assets: []
     }));
     const content = await zip.generateAsync({ type: "nodebuffer" });
-    const res = await fetch('http://127.0.0.1:3005/api/restore', { method: 'POST', body: content });
+    const res = await fetch('http://127.0.0.1:3005/api/restore', { method: 'POST', body: content as unknown as BodyInit });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(400);
   });
@@ -104,7 +105,7 @@ describe('Fase 10 - Restore', () => {
       assets: []
     }));
     const content = await zip.generateAsync({ type: "nodebuffer" });
-    const res = await fetch('http://127.0.0.1:3005/api/restore', { method: 'POST', body: content });
+    const res = await fetch('http://127.0.0.1:3005/api/restore', { method: 'POST', body: content as unknown as BodyInit });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(400);
   });
@@ -118,7 +119,7 @@ describe('Fase 10 - Restore', () => {
       assets: [{ hash: "deadbeef", size_bytes: 60 * 1024 * 1024, relative_path: "fake" }]
     }));
     const content = await zip.generateAsync({ type: "nodebuffer" });
-    const res = await fetch('http://127.0.0.1:3005/api/restore', { method: 'POST', body: content });
+    const res = await fetch('http://127.0.0.1:3005/api/restore', { method: 'POST', body: content as unknown as BodyInit });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(400);
   });
@@ -135,7 +136,7 @@ describe('Fase 10 - Restore', () => {
     
     const content = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 9 } });
     
-    const res = await fetch('http://127.0.0.1:3005/api/restore', { method: 'POST', body: content });
+    const res = await fetch('http://127.0.0.1:3005/api/restore', { method: 'POST', body: content as unknown as BodyInit });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(400);
   });
