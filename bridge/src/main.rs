@@ -15,6 +15,7 @@ mod identity;
 mod dialogs;
 mod shell;
 mod db;
+mod migrations;
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -73,11 +74,23 @@ async fn main() {
     let db_pool = match db::create_pool() {
         Ok(pool) => {
             println!("PostgreSQL pool creado exitosamente.");
+            
+            // Correr migraciones al arrancar
+            if let Ok(mut client) = pool.get().await {
+                if let Err(e) = migrations::run_migrations(&mut client).await {
+                    eprintln!("Error FATAL ejecutando migraciones: {:?}", e);
+                    std::process::exit(1);
+                }
+            } else {
+                eprintln!("Error FATAL obteniendo cliente para migraciones.");
+                std::process::exit(1);
+            }
+            
             Some(pool)
         }
         Err(e) => {
-            println!("Advertencia: No se pudo crear el pool de PostgreSQL: {}", e);
-            None
+            eprintln!("Error FATAL: No se pudo crear el pool de PostgreSQL: {}", e);
+            std::process::exit(1);
         }
     };
 
