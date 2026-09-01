@@ -1,0 +1,10 @@
+C:\Users\ekade\Desktop\EKADE\PROYECTOS\PAGINAS-WEB\NEW-AGE\notas\Agosto-2026-Excalidraw\excalidraw-fork-folders\bridge\target\debug\deps\md5-31bc84f4292b6617.d: C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\lib.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\block_api.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\compress.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\consts.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\../README.md C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\compress\soft.rs
+
+C:\Users\ekade\Desktop\EKADE\PROYECTOS\PAGINAS-WEB\NEW-AGE\notas\Agosto-2026-Excalidraw\excalidraw-fork-folders\bridge\target\debug\deps\libmd5-31bc84f4292b6617.rmeta: C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\lib.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\block_api.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\compress.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\consts.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\../README.md C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\compress\soft.rs
+
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\lib.rs:
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\block_api.rs:
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\compress.rs:
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\consts.rs:
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\../README.md:
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.11.0\src\compress\soft.rs:

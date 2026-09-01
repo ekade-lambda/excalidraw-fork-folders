@@ -12,6 +12,7 @@
  *   - No se construye UI ni navegación (Fases posteriores).
  */
 
+import { createStore, entries, clear } from "idb-keyval";
 import { utf8ToBase64 } from "./materialize";
 import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 
@@ -80,6 +81,21 @@ function readLegacyElements(): ExcalidrawElement[] {
   }
 }
 
+async function readLegacyFiles(): Promise<BinaryFiles> {
+  try {
+    const filesStore = createStore("files-db", "files-store");
+    const allEntries = await entries<string, any>(filesStore);
+    const files: BinaryFiles = {};
+    for (const [id, data] of allEntries) {
+      files[id] = data;
+    }
+    return files;
+  } catch (err) {
+    console.warn("Failed to read legacy files from IndexedDB", err);
+    return {};
+  }
+}
+
 function buildBoardData(
   boardId: BoardId,
   name: string,
@@ -134,14 +150,32 @@ export async function initializeBoardSystem(
   repo: BoardRepository,
 ): Promise<BoardBootResult> {
   const existing = await repo.load();
+  const legacy = hasLegacyState();
+  
+  let legacyElements: ExcalidrawElement[] = [];
+  let legacyFiles: BinaryFiles = {};
+  if (legacy) {
+    legacyElements = readLegacyElements();
+    legacyFiles = await readLegacyFiles();
+  }
 
   if (!existing) {
-    // Casos B/C
-    const legacy = hasLegacyState();
-    const elements = readLegacyElements();
     const { graph, rootFolderId, rootBoardId } = await createRoot(repo);
-    const boardData = buildBoardData(rootBoardId, "root", elements);
+    const boardData = buildBoardData(rootBoardId, legacy ? 'Migración Local' : 'root', legacyElements);
+    boardData.files = legacyFiles;
+
     await repo.saveBoard(boardData);
+
+    if (legacy) {
+      try {
+        window.localStorage.removeItem(LEGACY_ELEMENTS_KEY);
+        const filesStore = createStore('files-db', 'files-store');
+        await clear(filesStore);
+      } catch (e) {
+        console.warn('Fase 8.1: No se pudo limpiar IndexedDB tras migración', e);
+      }
+    }
+
     commitState(rootBoardId, rootFolderId, boardData);
     return {
       graph,
@@ -153,7 +187,54 @@ export async function initializeBoardSystem(
     };
   }
 
-  // Caso A: graph ya existe → el legacy (si existe) NO tiene prioridad.
+  // Caso A: Graph ya existe
+  if (legacy) {
+    // Migrar legacy a un nuevo folder/board dentro del graph existente
+    const folderId = 'f-legacy-' + Date.now();
+    const boardId = 'b-legacy-' + Date.now();
+    
+    existing.folders[folderId] = {
+      id: folderId,
+      name: 'Importación Legacy',
+      parentId: existing.rootFolderId,
+      boardId: boardId,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    existing.boards[boardId] = {
+      id: boardId,
+      name: 'Importación Legacy',
+      rootFolderId: folderId,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    
+    await repo.save(existing);
+    
+    const boardData = buildBoardData(boardId, 'Importación Legacy', legacyElements);
+    boardData.files = legacyFiles;
+    
+    await repo.saveBoard(boardData);
+    
+    try {
+      window.localStorage.removeItem(LEGACY_ELEMENTS_KEY);
+      const filesStore = createStore('files-db', 'files-store');
+      await clear(filesStore);
+    } catch (e) {
+      console.warn('Fase 8.1: No se pudo limpiar IndexedDB tras migración concurrente', e);
+    }
+    
+    commitState(boardId, folderId, boardData);
+    return {
+      graph: existing,
+      currentBoardId: boardId,
+      currentFolderId: folderId,
+      boardData,
+      migrated: true,
+      createdRoot: false,
+    };
+  }
+
   const rootBoardId = existing.folders[existing.rootFolderId].boardId;
   let boardId =
     existing.lastOpenBoardId &&
@@ -164,12 +245,11 @@ export async function initializeBoardSystem(
     boardId = rootBoardId;
   }
 
-  // Board inexistente/ausente → comportamiento seguro (no corromper graph).
   let boardData = await repo.loadBoard(boardId);
   if (!boardData) {
     boardData = buildBoardData(
       boardId,
-      existing.boards[boardId]?.name ?? "root",
+      existing.boards[boardId]?.name ?? 'root',
       [],
     );
   }

@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Json, State},
+    extract::{Json, State, DefaultBodyLimit},
     http::{Method, StatusCode},
     routing::{delete, get, post},
     Router,
@@ -115,6 +115,7 @@ async fn main() {
         .route("/api/boards/:id", get(api::get_board).post(api::post_board).delete(api::delete_board))
         .route("/api/transaction/apply", post(api::apply_transaction))
         .route("/api/boards/clone", post(api::clone_boards))
+        .layer(DefaultBodyLimit::max(100 * 1024 * 1024)) // 100 MB limit to allow large image uploads
         .layer(cors)
         .with_state(shared_state);
 

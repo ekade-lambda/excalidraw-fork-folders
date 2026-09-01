@@ -44,34 +44,53 @@ pub async fn extract_and_save_assets(files: &mut Value, tx: &Transaction<'_>) ->
                     let relative_path = format!("{}.bin", hash_hex);
                     let physical_path = assets_dir.join(&relative_path);
 
-                    // Write atomically if not exists
-                    if !physical_path.exists() {
-                        let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-                        let temp_name = format!("temp_{}_{}.bin", hash_hex, timestamp);
-                        let temp_path = assets_dir.join(&temp_name);
-                        
-                        let decoded_clone = decoded.clone();
-                        let temp_path_clone = temp_path.clone();
-                        let physical_path_clone = physical_path.clone();
-                        
-                        tokio::task::spawn_blocking(move || {
-                            fs::write(&temp_path_clone, decoded_clone)?;
-                            // Rename atomically. If someone else did it concurrently, it might fail or overwrite.
-                            // We ignore errors if the target already exists now.
-                            match fs::rename(&temp_path_clone, &physical_path_clone) {
+                    let decoded_clone = decoded.clone();
+                    let physical_path_clone = physical_path.clone();
+                    let hash_hex_clone = hash_hex.clone();
+                    let assets_dir_clone = assets_dir.clone();
+
+                    // Escribir CAS con Idempotencia y Verificación post-escritura
+                    tokio::task::spawn_blocking(move || -> Result<(), String> {
+                        if physical_path_clone.exists() {
+                            // Idempotencia: Verificar que el archivo existente no esté corrupto
+                            let existing_bytes = fs::read(&physical_path_clone).map_err(|e| format!("Failed to read existing CAS file: {}", e))?;
+                            let mut verify_hasher = Sha256::new();
+                            verify_hasher.update(&existing_bytes);
+                            if hex::encode(verify_hasher.finalize()) != hash_hex_clone {
+                                return Err("Existing CAS file is corrupt (hash mismatch)".to_string());
+                            }
+                        } else {
+                            // Escritura segura atómica
+                            let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+                            let temp_name = format!("temp_{}_{}.bin", hash_hex_clone, timestamp);
+                            let temp_path = assets_dir_clone.join(&temp_name);
+                            
+                            fs::write(&temp_path, &decoded_clone).map_err(|e| format!("Write failed: {}", e))?;
+                            
+                            match fs::rename(&temp_path, &physical_path_clone) {
                                 Ok(_) => (),
                                 Err(e) => {
                                     if physical_path_clone.exists() {
-                                        // Ignore, another thread beat us to it.
-                                        let _ = fs::remove_file(&temp_path_clone);
+                                        let _ = fs::remove_file(&temp_path);
                                     } else {
-                                        return Err(e);
+                                        return Err(format!("Rename failed: {}", e));
                                     }
                                 }
                             }
-                            Ok::<(), std::io::Error>(())
-                        }).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
-                    }
+                            
+                            // Verificación estricta post-escritura
+                            if !physical_path_clone.exists() {
+                                return Err("File missing immediately after rename".to_string());
+                            }
+                            let written_bytes = fs::read(&physical_path_clone).map_err(|e| format!("Verify read failed: {}", e))?;
+                            let mut verify_hasher = Sha256::new();
+                            verify_hasher.update(&written_bytes);
+                            if hex::encode(verify_hasher.finalize()) != hash_hex_clone {
+                                return Err("Hash mismatch after write operation".to_string());
+                            }
+                        }
+                        Ok(())
+                    }).await.map_err(|e| e.to_string())??;
 
                     // UPSERT into excalidraw.assets
                     let mime_type = file_data_obj.get("mimeType").and_then(|v| v.as_str()).unwrap_or("application/octet-stream").to_string();

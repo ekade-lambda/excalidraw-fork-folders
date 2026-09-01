@@ -1,132 +1,137 @@
-﻿const fs = require('fs');
-let content = fs.readFileSync('excalidraw-app/App.tsx', 'utf8');
+const fs = require('fs');
+let code = fs.readFileSync('excalidraw-app/boards/host/boardService.ts', 'utf8');
 
-// 1. Add import
-if (!content.includes('LinkToFileContextMenu')) {
-    content = content.replace(
-        'import { hitTestLinkToFileAtPoint } from "./boards/link-to-file/host/hitTestLinkToFile";',
-        'import { hitTestLinkToFileAtPoint } from "./boards/link-to-file/host/hitTestLinkToFile";\nimport { LinkToFileContextMenu, type LinkToFileCtx } from "./boards/link-to-file/ui/LinkToFileContextMenu";'
-    );
-}
+const replacement = `export async function initializeBoardSystem(
+  repo: BoardRepository,
+): Promise<BoardBootResult> {
+  const existing = await repo.load();
+  const legacy = hasLegacyState();
+  
+  let legacyElements: ExcalidrawElement[] = [];
+  let legacyFiles: BinaryFiles = {};
+  if (legacy) {
+    legacyElements = readLegacyElements();
+    legacyFiles = await readLegacyFiles();
+  }
 
-// 2. Add state
-if (!content.includes('linkToFileCtx')) {
-    content = content.replace(
-        'const [renameCtx, setRenameCtx] = useState<{',
-        'const [linkToFileCtx, setLinkToFileCtx] = useState<LinkToFileCtx | null>(null);\n  const [renameCtx, setRenameCtx] = useState<{'
-    );
-}
+  if (!existing) {
+    const { graph, rootFolderId, rootBoardId } = await createRoot(repo);
+    const boardData = buildBoardData(rootBoardId, legacy ? 'Migración Local' : 'root', legacyElements);
+    boardData.files = legacyFiles;
 
-// 3. handleGlobalPointerDown
-content = content.replace(
-    '// Clicked outside, close Rename\n      setRenameCtx(null);',
-    '// Clicked outside, close Rename\n      setRenameCtx(null);\n      setLinkToFileCtx(null);'
-);
+    await repo.saveBoard(boardData);
 
-// 4. handleHostContextMenu
-const target =   const handleHostContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!excalidrawAPI) {
-      return;
-    }
-    const { clientX, clientY } = event;
-    const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
-      { clientX, clientY },
-      excalidrawAPI.getAppState(),
-    );
-    const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
-    const hit = hitTestFolderAtPoint(elements, { x: sceneX, y: sceneY });
-
-    if (hit.kind !== "none") {
-      const fId = hit.kind === "folder" ? hit.folderId : hit.targetFolderId;
-      let initialName = "";
-      for (const el of elements) {
-        const m = el.customData?.folderBoard;
-        if (
-          m &&
-          (m.folderId === fId || m.targetFolderId === fId) &&
-          m.role === "text"
-        ) {
-          initialName = (el as any).text || "";
-          break;
-        }
+    if (legacy) {
+      try {
+        window.localStorage.removeItem(LEGACY_ELEMENTS_KEY);
+        const filesStore = createStore('files-db', 'files-store');
+        await clear(filesStore);
+      } catch (e) {
+        console.warn('Fase 8.1: No se pudo limpiar IndexedDB tras migración', e);
       }
-
-      // It's a folder or pointer, but DO NOT intercept native menu to preserve it
-
-      setRenameCtx({
-        folderId: fId,
-        initialName,
-        x: clientX,
-        y: clientY,
-      });
-    } else {
-      setRenameCtx(null);
     }
-  };;
 
-const replacement =   const handleHostContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!excalidrawAPI) {
-      return;
+    commitState(rootBoardId, rootFolderId, boardData);
+    return {
+      graph,
+      currentBoardId: rootBoardId,
+      currentFolderId: rootFolderId,
+      boardData,
+      migrated: legacy,
+      createdRoot: true,
+    };
+  }
+
+  // Caso A: Graph ya existe
+  if (legacy) {
+    // Migrar legacy a un nuevo folder/board dentro del graph existente
+    const folderId = 'f-legacy-' + Date.now();
+    const boardId = 'b-legacy-' + Date.now();
+    
+    existing.folders[folderId] = {
+      id: folderId,
+      name: 'Importación Legacy',
+      parentId: existing.rootFolderId,
+      boardId: boardId,
+      created: Date.now(),
+      updated: Date.now(),
+      deleted: false
+    };
+    existing.boards[boardId] = {
+      id: boardId,
+      rootFolderId: folderId
+    };
+    
+    await repo.save(existing);
+    
+    const boardData = buildBoardData(boardId, 'Importación Legacy', legacyElements);
+    boardData.files = legacyFiles;
+    
+    await repo.saveBoard(boardData);
+    
+    try {
+      window.localStorage.removeItem(LEGACY_ELEMENTS_KEY);
+      const filesStore = createStore('files-db', 'files-store');
+      await clear(filesStore);
+    } catch (e) {
+      console.warn('Fase 8.1: No se pudo limpiar IndexedDB tras migración concurrente', e);
     }
-    const { clientX, clientY } = event;
-    const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
-      { clientX, clientY },
-      excalidrawAPI.getAppState(),
+    
+    commitState(boardId, folderId, boardData);
+    return {
+      graph: existing,
+      currentBoardId: boardId,
+      currentFolderId: folderId,
+      boardData,
+      migrated: true,
+      createdRoot: false,
+    };
+  }
+
+  const rootBoardId = existing.folders[existing.rootFolderId].boardId;
+  let boardId =
+    existing.lastOpenBoardId &&
+    existing.boards[existing.lastOpenBoardId] !== undefined
+      ? existing.lastOpenBoardId
+      : rootBoardId;
+  if (existing.boards[boardId] === undefined) {
+    boardId = rootBoardId;
+  }
+
+  let boardData = await repo.loadBoard(boardId);
+  if (!boardData) {
+    boardData = buildBoardData(
+      boardId,
+      existing.boards[boardId]?.name ?? 'root',
+      [],
     );
-    const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
-    const hit = hitTestFolderAtPoint(elements, { x: sceneX, y: sceneY });
-    const linkHit = hitTestLinkToFileAtPoint(elements, { x: sceneX, y: sceneY });
+  }
+  const folderId = existing.boards[boardId].rootFolderId;
+  commitState(boardId, folderId, boardData);
+  return {
+    graph: existing,
+    currentBoardId: boardId,
+    currentFolderId: folderId,
+    boardData,
+    migrated: false,
+    createdRoot: false,
+  };
+}`;
 
-    if (hit.kind !== "none") {
-      const fId = hit.kind === "folder" ? hit.folderId : hit.targetFolderId;
-      let initialName = "";
-      for (const el of elements) {
-        const m = el.customData?.folderBoard;
-        if (
-          m &&
-          (m.folderId === fId || m.targetFolderId === fId) &&
-          m.role === "text"
-        ) {
-          initialName = (el as any).text || "";
-          break;
-        }
-      }
-
-      setRenameCtx({
-        folderId: fId,
-        initialName,
-        x: clientX,
-        y: clientY,
-      });
-      setLinkToFileCtx(null);
-    } else if (linkHit.hit && linkHit.element && linkHit.linkData) {
-      setLinkToFileCtx({
-        element: linkHit.element,
-        linkData: linkHit.linkData,
-        x: clientX,
-        y: clientY,
-      });
-      setRenameCtx(null);
-    } else {
-      setRenameCtx(null);
-      setLinkToFileCtx(null);
+const idx1 = code.indexOf("export async function initializeBoardSystem");
+let endBracket = -1;
+let openBrackets = 0;
+for (let i = idx1; i < code.length; i++) {
+  if (code[i] === '{') openBrackets++;
+  else if (code[i] === '}') {
+    openBrackets--;
+    if (openBrackets === 0) {
+      endBracket = i;
+      break;
     }
-  };;
+  }
+}
+const toReplace = code.substring(idx1, endBracket + 1);
+code = code.replace(toReplace, replacement);
 
-content = content.replace(target, replacement);
-
-// 5. Render LinkToFileContextMenu
-const renderTarget = {renameCtx && (;
-const renderReplacement = {linkToFileCtx && (
-          <LinkToFileContextMenu
-            ctx={linkToFileCtx}
-            excalidrawAPI={excalidrawAPI!}
-            onClose={() => setLinkToFileCtx(null)}
-          />
-        )}
-
-        {renameCtx && (;
-
-content = content.replace(renderTarget, renderReplacement);
-
-fs.writeFileSync('excalidraw-app/App.tsx', content);
+fs.writeFileSync('excalidraw-app/boards/host/boardService.ts', code);
