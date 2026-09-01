@@ -1,0 +1,10 @@
+C:\Users\ekade\Desktop\EKADE\PROYECTOS\PAGINAS-WEB\NEW-AGE\notas\Agosto-2026-Excalidraw\excalidraw-fork-folders\bridge\target\debug\deps\hmac-f6197f5277e1699f.d: C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\lib.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\block_api.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\simple.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\simple_reset.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\utils.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\../README.md
+
+C:\Users\ekade\Desktop\EKADE\PROYECTOS\PAGINAS-WEB\NEW-AGE\notas\Agosto-2026-Excalidraw\excalidraw-fork-folders\bridge\target\debug\deps\libhmac-f6197f5277e1699f.rmeta: C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\lib.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\block_api.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\simple.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\simple_reset.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\utils.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\../README.md
+
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\lib.rs:
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\block_api.rs:
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\simple.rs:
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\simple_reset.rs:
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\utils.rs:
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hmac-0.13.0\src\../README.md:

@@ -1,0 +1,12 @@
+C:\Users\ekade\Desktop\EKADE\PROYECTOS\PAGINAS-WEB\NEW-AGE\notas\Agosto-2026-Excalidraw\excalidraw-fork-folders\bridge\target\debug\deps\thiserror-cae42e680def3dd0.d: C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\lib.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\aserror.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\display.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\var.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\private.rs C:\Users\ekade\Desktop\EKADE\PROYECTOS\PAGINAS-WEB\NEW-AGE\notas\Agosto-2026-Excalidraw\excalidraw-fork-folders\bridge\target\debug\build\thiserror-49e1d36a183d698b\out/private.rs
+
+C:\Users\ekade\Desktop\EKADE\PROYECTOS\PAGINAS-WEB\NEW-AGE\notas\Agosto-2026-Excalidraw\excalidraw-fork-folders\bridge\target\debug\deps\libthiserror-cae42e680def3dd0.rmeta: C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\lib.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\aserror.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\display.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\var.rs C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\private.rs C:\Users\ekade\Desktop\EKADE\PROYECTOS\PAGINAS-WEB\NEW-AGE\notas\Agosto-2026-Excalidraw\excalidraw-fork-folders\bridge\target\debug\build\thiserror-49e1d36a183d698b\out/private.rs
+
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\lib.rs:
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\aserror.rs:
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\display.rs:
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\var.rs:
+C:\Users\ekade\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.20\src\private.rs:
+C:\Users\ekade\Desktop\EKADE\PROYECTOS\PAGINAS-WEB\NEW-AGE\notas\Agosto-2026-Excalidraw\excalidraw-fork-folders\bridge\target\debug\build\thiserror-49e1d36a183d698b\out/private.rs:
+
+# env-dep:OUT_DIR=C:\\Users\\ekade\\Desktop\\EKADE\\PROYECTOS\\PAGINAS-WEB\\NEW-AGE\\notas\\Agosto-2026-Excalidraw\\excalidraw-fork-folders\\bridge\\target\\debug\\build\\thiserror-49e1d36a183d698b\\out

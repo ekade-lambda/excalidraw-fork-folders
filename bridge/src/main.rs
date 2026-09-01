@@ -18,6 +18,7 @@ mod db;
 mod migrations;
 mod api;
 mod assets;
+mod backup;
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -115,6 +116,7 @@ async fn main() {
         .route("/api/boards/:id", get(api::get_board).post(api::post_board).delete(api::delete_board))
         .route("/api/transaction/apply", post(api::apply_transaction))
         .route("/api/boards/clone", post(api::clone_boards))
+        .route("/api/backup", post(backup::backup_workspace))
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024)) // 100 MB limit to allow large image uploads
         .layer(cors)
         .with_state(shared_state);
