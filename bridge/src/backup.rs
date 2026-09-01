@@ -62,7 +62,8 @@ pub async fn create_backup(pool: &deadpool_postgres::Pool) -> Result<String, Str
     let db_json_str = serde_json::to_string(&db_json_val).unwrap();
 
     // Generate zip in blocking task
-    let zip_filename = format!("backup_excalidraw_{}.zip", Utc::now().format("%Y%m%d_%H%M%S"));
+    let unique_id = Uuid::new_v4().to_string()[..8].to_string();
+    let zip_filename = format!("backup_excalidraw_{}_{}.zip", Utc::now().format("%Y%m%d_%H%M%S"), unique_id);
     let temp_filename = format!("temp_backup_{}.zip", Uuid::new_v4());
     
     let backups_dir = PathBuf::from("./data/backups");
@@ -77,7 +78,6 @@ pub async fn create_backup(pool: &deadpool_postgres::Pool) -> Result<String, Str
 
     let temp_path_clone = temp_path.clone();
     let final_path_clone = final_path.clone();
-    let zip_filename_clone = zip_filename.clone();
     
     let zip_result = tokio::task::spawn_blocking(move || -> Result<(), String> {
         let file = File::create(&temp_path_clone).map_err(|e| format!("Failed creating temp zip: {}", e))?;

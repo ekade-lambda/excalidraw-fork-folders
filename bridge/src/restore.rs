@@ -242,7 +242,7 @@ async fn restore_workspace_inner(state: Arc<AppState>, bytes: Bytes) -> Result<s
 
 fn read_zip_file_with_limit(archive: &mut ZipArchive<File>, filename: &str, limit_bytes: u64) -> Result<String, String> {
     let mut file = archive.by_name(filename).map_err(|_| format!("{} not found in zip", filename))?;
-    let mut contents = String::new();
+    let contents;
     
     // We use a custom loop to enforce limits since `take` creates a new Read adapter
     // and we still want to know if there's more data left

@@ -1,4 +1,4 @@
-use deadpool_postgres::Client;
+
 use std::error::Error;
 
 pub async fn run_migrations(client: &mut tokio_postgres::Client) -> Result<(), Box<dyn Error>> {

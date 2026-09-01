@@ -1,7 +1,7 @@
 use axum::{
     extract::{Json, State, DefaultBodyLimit},
-    http::{Method, StatusCode},
-    routing::{delete, get, post},
+    http::Method,
+    routing::{get, post},
     Router,
 };
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,8 @@ use deadpool_postgres::Pool;
 
 mod identity;
 mod dialogs;
-use std::sync::atomic::AtomicBool;
+mod scheduler;
+
 
 mod shell;
 mod db;
@@ -132,7 +133,11 @@ async fn main() {
         .route("/api/backup-retention", post(backup_retention::retention_endpoint))
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024)) // 100 MB limit to allow large image uploads
         .layer(cors)
-        .with_state(shared_state);
+        .with_state(shared_state.clone());
+
+    // Iniciar scheduler en background (1 hora = 3600 segundos)
+    let interval = std::env::var("SCHEDULER_INTERVAL_SECS").unwrap_or_else(|_| "3600".to_string()).parse().unwrap_or(3600);
+    scheduler::start_scheduler(shared_state.clone(), interval);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3005));
     println!("Bridge listening on {}", addr);

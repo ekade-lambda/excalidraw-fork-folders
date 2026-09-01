@@ -152,4 +152,46 @@ describe('Fase 11.3 - Backup Retention Tests', () => {
         if (fs.existsSync(symPath)) fs.unlinkSync(symPath);
         fs.unlinkSync(dummyPath);
     });
+
+    it('Test 6: Dos backups en el mismo segundo no colisionan', async () => {
+        await cleanBackupsDir();
+        
+        const req1 = fetch('http://127.0.0.1:3005/api/backup', { method: 'POST' });
+        const req2 = fetch('http://127.0.0.1:3005/api/backup', { method: 'POST' });
+        
+        const [res1, res2] = await Promise.all([req1, req2]);
+        const data1 = await res1.json();
+        const data2 = await res2.json();
+        
+        expect(res1.ok).toBe(true);
+        expect(res2.ok).toBe(true);
+        expect(data1.filename).toBeDefined();
+        expect(data2.filename).toBeDefined();
+        
+        expect(data1.filename).not.toBe(data2.filename);
+        
+        const path1 = path.join(BACKUPS_DIR, data1.filename);
+        const path2 = path.join(BACKUPS_DIR, data2.filename);
+        
+        expect(fs.existsSync(path1)).toBe(true);
+        expect(fs.existsSync(path2)).toBe(true);
+    });
+
+    it('Test 7: Retention reconoce tanto formato nuevo como antiguo', async () => {
+        await cleanBackupsDir();
+        
+        const oldFormatPath = path.join(BACKUPS_DIR, 'backup_excalidraw_20240101_120000.zip');
+        await createZipFile(oldFormatPath, true);
+        
+        const newFormatPath = path.join(BACKUPS_DIR, 'backup_excalidraw_20240101_120000_1234abcd.zip');
+        await createZipFile(newFormatPath, true);
+        
+        const res = await fetch(API_URL, { method: 'POST' });
+        const data = await res.json();
+        
+        expect(data.stats.valid_backups_found).toBe(2);
+        
+        expect(fs.existsSync(oldFormatPath)).toBe(true);
+        expect(fs.existsSync(newFormatPath)).toBe(true);
+    });
 });

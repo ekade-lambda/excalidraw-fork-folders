@@ -36,7 +36,7 @@ pub async fn retention_endpoint() -> Result<impl IntoResponse, StatusCode> {
     }
 }
 
-async fn run_retention() -> Result<RetentionStats, String> {
+pub async fn run_retention() -> Result<RetentionStats, String> {
     let mut stats = RetentionStats {
         total_scanned: 0,
         valid_backups_found: 0,
@@ -136,7 +136,6 @@ async fn run_retention() -> Result<RetentionStats, String> {
             valid_count += 1;
             if valid_count == 5 {
                 t_quorum = Some(cand.timestamp);
-                break;
             }
         }
     }
@@ -168,12 +167,20 @@ async fn run_retention() -> Result<RetentionStats, String> {
 }
 
 fn parse_backup_name(name: &str) -> Option<DateTime<Utc>> {
-    // backup_excalidraw_YYYYMMDD_HHMMSS.zip (37 chars)
-    if name.len() != 37 { return None; }
     if !name.starts_with("backup_excalidraw_") || !name.ends_with(".zip") { return None; }
 
-    let date_str = &name[18..26]; // YYYYMMDD
-    let time_str = &name[27..33]; // HHMMSS
+    let inner = &name[18..name.len()-4];
+    if inner.len() < 15 { return None; }
+
+    let date_str = &inner[0..8];
+    let underscore = &inner[8..9];
+    let time_str = &inner[9..15];
+
+    if underscore != "_" { return None; }
+
+    // Backward and forward compatibility:
+    // If it's longer than 15 chars, it must be the new format which separates the suffix with an underscore.
+    if inner.len() > 15 && !inner[15..].starts_with('_') { return None; }
 
     let parse_str = format!("{} {}", date_str, time_str);
     if let Ok(naive) = NaiveDateTime::parse_from_str(&parse_str, "%Y%m%d %H%M%S") {

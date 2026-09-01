@@ -3,7 +3,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use deadpool_postgres::Pool;
+
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -82,13 +82,6 @@ pub struct BoardDataDto {
 #[serde(rename_all = "camelCase")]
 pub struct CloneBoardsRequest {
     pub old_to_new_board_map: HashMap<String, String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct TransactionRequest {
-    pub new_graph: BoardsGraphDto,
-    pub deleted_boards: Vec<String>,
 }
 
 // ============================================================================

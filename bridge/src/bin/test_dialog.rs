@@ -1,8 +1,7 @@
 use std::thread;
-use windows::core::PWSTR;
-use windows::Win32::Foundation::HWND;
 use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED, COINIT_DISABLE_OLE1DDE};
-use windows::Win32::UI::Shell::{FileOpenDialog, IFileOpenDialog, IShellItem, SIGDN_FILESYSPATH};
+use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::Shell::{FileOpenDialog, IFileOpenDialog};
 
 fn main() {
     let handle = thread::spawn(|| {
