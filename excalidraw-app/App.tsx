@@ -160,7 +160,7 @@ import { handleOnPaste } from "./boards/host/paste";
 
 import { initializeBoardSystem } from "./boards/host/boardService";
 import { startMultiTabSync } from "./boards/host/reconciliation";
-import { LocalStorageBoardRepository } from "./boards/repository/LocalStorageBoardRepository";
+import { PostgresBoardRepository } from "./boards/repository/PostgresBoardRepository";
 import { createFolder } from "./boards/host/folderService";
 import { boardsStoreActions } from "./boards/host/boardState";
 import { openFolder } from "./boards/host/boardService";
@@ -427,7 +427,7 @@ const ExcalidrawWrapper = () => {
     promise: ResolvablePromise<ExcalidrawInitialDataState | null>;
   }>({ promise: null! });
 
-  const boardRepo = useMemo(() => new LocalStorageBoardRepository(), []);
+  const boardRepo: import("./boards/repository/BoardRepository").BoardRepository = useMemo(() => new PostgresBoardRepository(), []);
   if (!initialStatePromiseRef.current.promise) {
     initialStatePromiseRef.current.promise =
       resolvablePromise<ExcalidrawInitialDataState | null>();
@@ -515,7 +515,7 @@ const ExcalidrawWrapper = () => {
     if (!excalidrawAPI) {
       return;
     }
-    const repo = new LocalStorageBoardRepository();
+    const repo = new PostgresBoardRepository();
     initializeBoardSystem(repo)
       .then((bootResult) => {
         if (bootResult && excalidrawAPI) {
@@ -576,7 +576,7 @@ const ExcalidrawWrapper = () => {
 
         if (plan === "CREATE_FOLDER") {
           createFolder({
-            repo: new LocalStorageBoardRepository(),
+            repo: new PostgresBoardRepository(),
             excalidrawAPI,
             parentFolderId: parentFolderId as string,
             sceneX,
@@ -808,7 +808,7 @@ const ExcalidrawWrapper = () => {
       hit.kind === "folder" ? hit.folderId : hit.targetFolderId;
 
     void openFolder({
-      repo: new LocalStorageBoardRepository(),
+      repo: new PostgresBoardRepository(),
       excalidrawAPI,
       folderId: targetFolderId,
     }).catch((error) => {

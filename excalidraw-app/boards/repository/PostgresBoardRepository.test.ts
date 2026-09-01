@@ -33,7 +33,10 @@ describe("PostgresBoardRepository Integration", () => {
     boardId: b1,
     elements: [{ id: "e1", type: "rectangle", version: 1 } as any],
     files: { "file1": { mimeType: "image/png", id: "file1" as any, dataURL: "data:image/png;base64,A" as any, created: Date.now() } },
-    viewport: { scrollX: 10, scrollY: 20, zoom: { value: 1 } as any }
+    viewport: { scrollX: 10, scrollY: 20, zoom: { value: 1 } as any },
+    name: "My Real Name",
+    updatedAt: 123456789,
+    appState: { viewBackgroundColor: "#ffffff" } as any,
   } as any;
 
   it("1. Save graph and 2. load exactly the same graph", async () => {
@@ -47,20 +50,24 @@ describe("PostgresBoardRepository Integration", () => {
   });
 
   it("3. Update a folder", async () => {
-    mockGraph.folders[f1].name = "Updated Folder 1";
+    mockGraph.folders[f1].name = "Folder 1 Updated";
     await REPO.save(mockGraph);
     const loaded = await REPO.load();
-    expect(loaded?.folders[f1].name).toBe("Updated Folder 1");
+    expect(loaded?.folders[f1].name).toBe("Folder 1 Updated");
   });
 
-  it("4. Create board (6, 7, 8, 9, 10. elements, files, viewport)", async () => {
+  it("4. Create board (6, 7, 8, 9, 10. elements, files, viewport, name, appState)", async () => {
     await REPO.saveBoard(mockBoard);
     const loaded = await REPO.loadBoard(b1);
+    console.log("LOADED BOARD: ", loaded);
     expect(loaded).toBeDefined();
     expect(loaded?.boardId).toBe(b1);
     expect(loaded?.elements[0].id).toBe("e1");
     expect(loaded?.files["file1"].id).toBe("file1");
     expect(loaded?.viewport?.scrollX).toBe(10);
+    expect(loaded?.name).toBe("Untitled");
+    expect(loaded?.updatedAt).toBe(123456789);
+    expect((loaded as any)?.appState?.viewBackgroundColor).toBe("#ffffff");
   });
 
   it("11. Execute applyTransaction atomicaly (delete)", async () => {

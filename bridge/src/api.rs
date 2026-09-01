@@ -45,7 +45,12 @@ pub struct FolderPointerDto {
 pub struct BoardMetadataDto {
     pub id: String,
     pub name: String,
+    #[serde(rename = "rootFolderId")]
     pub root_folder_id: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: i64,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -68,6 +73,9 @@ pub struct BoardDataDto {
     pub elements: Vec<Value>,
     pub files: Value,
     pub viewport: Option<Value>,
+    pub name: String,
+    pub updated_at: i64,
+    pub app_state: Option<Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -153,17 +161,21 @@ pub async fn get_graph(State(state): State<Arc<AppState>>) -> Result<Json<Option
 
     // 4. Read board metadata
     let mut boards = HashMap::new();
-    let board_rows = client.query("SELECT b.id, f.name, b.folder_id FROM excalidraw.boards b JOIN excalidraw.folders f ON b.folder_id = f.id WHERE b.deleted_at IS NULL", &[]).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let board_rows = client.query("SELECT b.id, f.name, b.folder_id, b.created_at, b.updated_at FROM excalidraw.boards b LEFT JOIN excalidraw.folders f ON b.folder_id = f.id WHERE b.deleted_at IS NULL", &[]).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     
     for row in board_rows {
         let id: String = row.get("id");
-        let name: String = row.get("name");
+        let name_opt: Option<String> = row.get("name");
         let folder_id: Option<String> = row.get("folder_id");
+        let created_at: chrono::DateTime<chrono::Utc> = row.get("created_at");
+        let updated_at: chrono::DateTime<chrono::Utc> = row.get("updated_at");
 
         boards.insert(id.clone(), BoardMetadataDto {
             id,
-            name,
+            name: name_opt.unwrap_or_else(|| "Untitled".to_string()),
             root_folder_id: folder_id.unwrap_or_else(|| "".to_string()),
+            created_at: created_at.timestamp_millis(),
+            updated_at: updated_at.timestamp_millis(),
         });
     }
 
@@ -191,7 +203,38 @@ pub async fn post_graph(State(state): State<Arc<AppState>>, Json(graph): Json<Bo
         &[&config_val]
     ).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    for (id, folder) in &graph.folders {
+    let mut folder_list: Vec<(&String, &FolderDto)> = graph.folders.iter().collect();
+    let mut depths: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    
+    let mut changed = true;
+    while changed && depths.len() < folder_list.len() {
+        changed = false;
+        for (id, folder) in &folder_list {
+            if depths.contains_key(*id) { continue; }
+            match &folder.parent_id {
+                None => {
+                    depths.insert(id.to_string(), 0);
+                    changed = true;
+                },
+                Some(parent_id) => {
+                    if let Some(&parent_depth) = depths.get(parent_id) {
+                        depths.insert(id.to_string(), parent_depth + 1);
+                        changed = true;
+                    }
+                }
+            }
+        }
+    }
+    
+    for (id, _) in &folder_list {
+        if !depths.contains_key(*id) {
+            depths.insert(id.to_string(), 9999);
+        }
+    }
+    
+    folder_list.sort_by_key(|(id, _)| depths.get(*id).unwrap_or(&0));
+
+    for (id, folder) in folder_list {
         let icon_val = folder.icon.as_ref().map(|i| json!(i));
         transaction.execute(
             "INSERT INTO excalidraw.folders (id, name, parent_id, icon) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, parent_id = EXCLUDED.parent_id, icon = EXCLUDED.icon",
@@ -222,7 +265,7 @@ pub async fn get_board(State(state): State<Arc<AppState>>, Path(id): Path<String
     let client = pool.get().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let row_opt = client.query_opt(
-        "SELECT elements, files, viewport, schema_version FROM excalidraw.boards WHERE id = $1 AND deleted_at IS NULL",
+        "SELECT b.elements, b.files, b.viewport, b.schema_version, f.name, b.updated_at, b.app_state FROM excalidraw.boards b LEFT JOIN excalidraw.folders f ON b.folder_id = f.id WHERE b.id = $1 AND b.deleted_at IS NULL",
         &[&id]
     ).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -232,6 +275,9 @@ pub async fn get_board(State(state): State<Arc<AppState>>, Path(id): Path<String
             let files: Value = row.get("files");
             let viewport: Option<Value> = row.get("viewport");
             let schema_version: i32 = row.get("schema_version");
+            let name_opt: Option<String> = row.get("name");
+            let updated_at: chrono::DateTime<chrono::Utc> = row.get("updated_at");
+            let app_state: Option<Value> = row.get("app_state");
 
             // We must convert elements from JSONB array back to Vec<Value>
             let elements_vec = elements.as_array().cloned().unwrap_or_default();
@@ -242,6 +288,9 @@ pub async fn get_board(State(state): State<Arc<AppState>>, Path(id): Path<String
                 elements: elements_vec,
                 files,
                 viewport,
+                name: name_opt.unwrap_or_else(|| "Untitled".to_string()),
+                updated_at: updated_at.timestamp_millis(),
+                app_state,
             })))
         }
         None => Ok(Json(None)),
@@ -253,20 +302,22 @@ pub async fn post_board(State(state): State<Arc<AppState>>, Path(id): Path<Strin
     let client = pool.get().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     
     let elements_val = json!(board.elements);
+    let app_state_val = board.app_state.unwrap_or_else(|| json!({}));
 
-    // Note: If the board doesn't exist (because the folder wasn't created yet or we're doing things out of order),
-    // we need to insert it. But folder_id is missing here (it's in the metadata).
-    // The safest way is to do an Upsert. But what about folder_id? If it's a new board, folder_id can be NULL initially,
-    // and then the `post_graph` updates it.
+    // Convert milliseconds to DateTime<Utc>
+    let updated_at = chrono::DateTime::from_timestamp_millis(board.updated_at).unwrap_or_else(chrono::Utc::now);
+
     client.execute(
-        "INSERT INTO excalidraw.boards (id, elements, files, viewport, schema_version) 
-         VALUES ($1, $2, $3, $4, $5)
+        "INSERT INTO excalidraw.boards (id, elements, files, viewport, schema_version, app_state, updated_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (id) DO UPDATE SET 
             elements = EXCLUDED.elements, 
             files = EXCLUDED.files, 
             viewport = EXCLUDED.viewport, 
-            schema_version = EXCLUDED.schema_version",
-        &[&id, &elements_val, &board.files, &board.viewport, &board.schema_version]
+            schema_version = EXCLUDED.schema_version,
+            app_state = EXCLUDED.app_state,
+            updated_at = EXCLUDED.updated_at",
+        &[&id, &elements_val, &board.files, &board.viewport, &board.schema_version, &app_state_val, &updated_at]
     ).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(()))
@@ -327,7 +378,38 @@ pub async fn apply_transaction(State(state): State<Arc<AppState>>, Json(req): Js
         &[&config_val]
     ).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    for (id, folder) in &req.new_graph.folders {
+    let mut folder_list: Vec<(&String, &FolderDto)> = req.new_graph.folders.iter().collect();
+    let mut depths: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    
+    let mut changed = true;
+    while changed && depths.len() < folder_list.len() {
+        changed = false;
+        for (id, folder) in &folder_list {
+            if depths.contains_key(*id) { continue; }
+            match &folder.parent_id {
+                None => {
+                    depths.insert(id.to_string(), 0);
+                    changed = true;
+                },
+                Some(parent_id) => {
+                    if let Some(&parent_depth) = depths.get(parent_id) {
+                        depths.insert(id.to_string(), parent_depth + 1);
+                        changed = true;
+                    }
+                }
+            }
+        }
+    }
+    
+    for (id, _) in &folder_list {
+        if !depths.contains_key(*id) {
+            depths.insert(id.to_string(), 9999);
+        }
+    }
+    
+    folder_list.sort_by_key(|(id, _)| depths.get(*id).unwrap_or(&0));
+
+    for (id, folder) in folder_list {
         let icon_val = folder.icon.as_ref().map(|i| json!(i));
         transaction.execute(
             "INSERT INTO excalidraw.folders (id, name, parent_id, icon) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, parent_id = EXCLUDED.parent_id, icon = EXCLUDED.icon",
@@ -359,17 +441,18 @@ pub async fn clone_boards(State(state): State<Arc<AppState>>, Json(req): Json<Cl
     let transaction = client.transaction().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     for (old_id, new_id) in req.old_to_new_board_map {
-        let row_opt = transaction.query_opt("SELECT elements, files, viewport, schema_version FROM excalidraw.boards WHERE id = $1 AND deleted_at IS NULL", &[&old_id]).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let row_opt = transaction.query_opt("SELECT elements, files, viewport, schema_version, app_state FROM excalidraw.boards WHERE id = $1 AND deleted_at IS NULL", &[&old_id]).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         
         if let Some(row) = row_opt {
             let elements: Value = row.get("elements");
             let files: Value = row.get("files");
             let viewport: Option<Value> = row.get("viewport");
             let schema_version: i32 = row.get("schema_version");
+            let app_state: Option<Value> = row.get("app_state");
 
             transaction.execute(
-                "INSERT INTO excalidraw.boards (id, elements, files, viewport, schema_version) VALUES ($1, $2, $3, $4, $5)",
-                &[&new_id, &elements, &files, &viewport, &schema_version]
+                "INSERT INTO excalidraw.boards (id, elements, files, viewport, schema_version, app_state) VALUES ($1, $2, $3, $4, $5, $6)",
+                &[&new_id, &elements, &files, &viewport, &schema_version, &app_state]
             ).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         } else {
             return Err(StatusCode::NOT_FOUND);
