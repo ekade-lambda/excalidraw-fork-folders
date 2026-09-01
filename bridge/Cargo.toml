@@ -13,6 +13,10 @@ tokio-postgres = { version = "0.7.18", features = ["with-chrono-0_4", "with-serd
 chrono = "0.4"
 dotenvy = "0.15.7"
 deadpool-postgres = "0.14.2"
+base64 = "0.23.1"
+sha2 = "0.11.0"
+rand = "0.10.2"
+hex = "0.4.3"
 
 [dependencies.windows]
 version = "0.58.0"

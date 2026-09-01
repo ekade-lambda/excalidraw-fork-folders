@@ -272,12 +272,18 @@ pub async fn get_board(State(state): State<Arc<AppState>>, Path(id): Path<String
     match row_opt {
         Some(row) => {
             let elements: Value = row.get("elements");
-            let files: Value = row.get("files");
+            let mut files: Value = row.get("files");
             let viewport: Option<Value> = row.get("viewport");
             let schema_version: i32 = row.get("schema_version");
             let name_opt: Option<String> = row.get("name");
             let updated_at: chrono::DateTime<chrono::Utc> = row.get("updated_at");
             let app_state: Option<Value> = row.get("app_state");
+
+            // Hidratar assets
+            if let Err(e) = crate::assets::hydrate_assets(&mut files, &client).await {
+                eprintln!("Error hidratando assets para board {}: {}", id, e);
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
 
             // We must convert elements from JSONB array back to Vec<Value>
             let elements_vec = elements.as_array().cloned().unwrap_or_default();
@@ -297,17 +303,25 @@ pub async fn get_board(State(state): State<Arc<AppState>>, Path(id): Path<String
     }
 }
 
-pub async fn post_board(State(state): State<Arc<AppState>>, Path(id): Path<String>, Json(board): Json<BoardDataDto>) -> Result<Json<()>, StatusCode> {
+pub async fn post_board(State(state): State<Arc<AppState>>, Path(id): Path<String>, Json(mut board): Json<BoardDataDto>) -> Result<Json<()>, StatusCode> {
     let pool = state.db_pool.as_ref().ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
-    let client = pool.get().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut client = pool.get().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     
+    let tx = client.transaction().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Extraer y guardar assets al filesystem de manera atómica con la DB
+    if let Err(e) = crate::assets::extract_and_save_assets(&mut board.files, &tx).await {
+        eprintln!("Error procesando assets: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
     let elements_val = json!(board.elements);
     let app_state_val = board.app_state.unwrap_or_else(|| json!({}));
 
     // Convert milliseconds to DateTime<Utc>
     let updated_at = chrono::DateTime::from_timestamp_millis(board.updated_at).unwrap_or_else(chrono::Utc::now);
 
-    client.execute(
+    tx.execute(
         "INSERT INTO excalidraw.boards (id, elements, files, viewport, schema_version, app_state, updated_at) 
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (id) DO UPDATE SET 
@@ -319,6 +333,8 @@ pub async fn post_board(State(state): State<Arc<AppState>>, Path(id): Path<Strin
             updated_at = EXCLUDED.updated_at",
         &[&id, &elements_val, &board.files, &board.viewport, &board.schema_version, &app_state_val, &updated_at]
     ).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    tx.commit().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(()))
 }

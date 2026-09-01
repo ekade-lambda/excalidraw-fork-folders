@@ -32,7 +32,7 @@ describe("PostgresBoardRepository Integration", () => {
     schemaVersion: 1,
     boardId: b1,
     elements: [{ id: "e1", type: "rectangle", version: 1 } as any],
-    files: { "file1": { mimeType: "image/png", id: "file1" as any, dataURL: "data:image/png;base64,A" as any, created: Date.now() } },
+    files: { "file1": { mimeType: "image/png", id: "file1" as any, dataURL: "data:image/png;base64,iVBORw0KGgo=" as any, created: Date.now() } },
     viewport: { scrollX: 10, scrollY: 20, zoom: { value: 1 } as any },
     name: "My Real Name",
     updatedAt: 123456789,

@@ -16,6 +16,8 @@ mod dialogs;
 mod shell;
 mod db;
 mod migrations;
+mod api;
+mod assets;
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -29,7 +31,7 @@ struct AppState {
     db_pool: Option<Pool>,
 }
 
-mod api;
+
 
 #[derive(Serialize)]
 struct FileIdentityDto {
