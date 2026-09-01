@@ -10,15 +10,17 @@
 
 import React from "react";
 
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import type { ExcalidrawImperativeAPI, AppState } from "@excalidraw/excalidraw/types";
 
 export const FOLDER_TOOL_CUSTOM_TYPE = "folder";
 export const FOLDER_POINTER_TOOL_CUSTOM_TYPE = "folderPointer";
 
 export const FolderToolButton = ({
   excalidrawAPI,
+  activeTool,
 }: {
   excalidrawAPI: ExcalidrawImperativeAPI;
+  activeTool?: AppState["activeTool"];
 }) => {
   const activate = () => {
     excalidrawAPI.setActiveTool({
@@ -28,22 +30,31 @@ export const FolderToolButton = ({
     });
   };
 
+  const isActive =
+    activeTool?.type === "custom" &&
+    activeTool?.customType === FOLDER_TOOL_CUSTOM_TYPE;
+  const className = `ToolIcon ToolIcon_type_toggle ${
+    isActive ? "ToolIcon--checked" : ""
+  }`;
+
   return (
     <button
       type="button"
       title="Folder tool"
-      className="board-tool-button"
+      className={className}
       onClick={activate}
     >
-      📁
+      <div className="ToolIcon__icon">📁</div>
     </button>
   );
 };
 
 export const FolderPointerToolButton = ({
   excalidrawAPI,
+  activeTool,
 }: {
   excalidrawAPI: ExcalidrawImperativeAPI;
+  activeTool?: AppState["activeTool"];
 }) => {
   const activate = () => {
     excalidrawAPI.setActiveTool({
@@ -53,14 +64,21 @@ export const FolderPointerToolButton = ({
     });
   };
 
+  const isActive =
+    activeTool?.type === "custom" &&
+    activeTool?.customType === FOLDER_POINTER_TOOL_CUSTOM_TYPE;
+  const className = `ToolIcon ToolIcon_type_toggle ${
+    isActive ? "ToolIcon--checked" : ""
+  }`;
+
   return (
     <button
       type="button"
       title="Folder Pointer tool"
-      className="board-tool-button"
+      className={className}
       onClick={activate}
     >
-      ↗️
+      <div className="ToolIcon__icon">↗📁</div>
     </button>
   );
 };

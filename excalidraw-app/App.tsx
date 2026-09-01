@@ -1396,9 +1396,9 @@ const ExcalidrawWrapper = () => {
                 order: 1,
               }}
             >
-              <FolderToolButton excalidrawAPI={excalidrawAPI} />
-              <FolderPointerToolButton excalidrawAPI={excalidrawAPI} />
-              <LinkToFileToolButton excalidrawAPI={excalidrawAPI} />
+              <FolderToolButton excalidrawAPI={excalidrawAPI} activeTool={appState.activeTool} />
+              <FolderPointerToolButton excalidrawAPI={excalidrawAPI} activeTool={appState.activeTool} />
+              <LinkToFileToolButton excalidrawAPI={excalidrawAPI} activeTool={appState.activeTool} />
               <NavBar repo={boardRepo} excalidrawAPI={excalidrawAPI} />
             </div>
           );
