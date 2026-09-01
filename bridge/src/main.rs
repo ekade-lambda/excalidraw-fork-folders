@@ -13,12 +13,15 @@ use deadpool_postgres::Pool;
 
 mod identity;
 mod dialogs;
+use std::sync::atomic::AtomicBool;
+
 mod shell;
 mod db;
 mod migrations;
 mod api;
 mod assets;
 mod backup;
+mod restore;
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -28,8 +31,10 @@ struct HealthResponse {
     db_error: Option<String>,
 }
 
-struct AppState {
-    db_pool: Option<Pool>,
+#[derive(Clone)]
+pub struct AppState {
+    pub db_pool: Option<Pool>,
+    pub restore_lock: Arc<tokio::sync::RwLock<()>>,
 }
 
 
@@ -99,7 +104,10 @@ async fn main() {
         }
     };
 
-    let shared_state = Arc::new(AppState { db_pool });
+    let shared_state = Arc::new(AppState { 
+        db_pool,
+        restore_lock: Arc::new(tokio::sync::RwLock::new(())),
+    });
 
     let cors = CorsLayer::new()
         // Allow local dev origin. For safety, we only allow localhost origins.
@@ -117,6 +125,7 @@ async fn main() {
         .route("/api/transaction/apply", post(api::apply_transaction))
         .route("/api/boards/clone", post(api::clone_boards))
         .route("/api/backup", post(backup::backup_workspace))
+        .route("/api/restore", post(restore::restore_workspace))
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024)) // 100 MB limit to allow large image uploads
         .layer(cors)
         .with_state(shared_state);

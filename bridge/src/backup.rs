@@ -17,12 +17,21 @@ use crate::AppState;
 
 pub async fn backup_workspace(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, StatusCode> {
     let pool = state.db_pool.as_ref().ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
-    let mut client = pool.get().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    match create_backup(pool).await {
+        Ok(filename) => Ok(Json(json!({ "ok": true, "filename": filename }))),
+        Err(msg) => {
+            eprintln!("Backup failed: {}", msg);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
 
-    let transaction = client.transaction().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+pub async fn create_backup(pool: &deadpool_postgres::Pool) -> Result<String, String> {
+    let mut client = pool.get().await.map_err(|e| e.to_string())?;
+    let transaction = client.transaction().await.map_err(|e| e.to_string())?;
     
     // REPEATABLE READ snapshot
-    transaction.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ", &[]).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    transaction.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ", &[]).await.map_err(|e| e.to_string())?;
 
     let tables = vec![
         "schema_migrations",
@@ -37,7 +46,7 @@ pub async fn backup_workspace(State(state): State<Arc<AppState>>) -> Result<impl
 
     for table in &tables {
         let query = format!("SELECT COALESCE(json_agg(t), '[]'::json) FROM excalidraw.{} t", table);
-        let row = transaction.query_one(&query, &[]).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let row = transaction.query_one(&query, &[]).await.map_err(|e| e.to_string())?;
         let data: Value = row.get(0);
         database_json.insert(table.to_string(), data);
     }
@@ -47,7 +56,7 @@ pub async fn backup_workspace(State(state): State<Arc<AppState>>) -> Result<impl
     let assets_list = assets_value.as_array().unwrap().clone();
 
     // End transaction
-    transaction.rollback().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    transaction.rollback().await.map_err(|e| e.to_string())?;
 
     let db_json_val = Value::Object(database_json);
     let db_json_str = serde_json::to_string(&db_json_val).unwrap();
@@ -58,7 +67,7 @@ pub async fn backup_workspace(State(state): State<Arc<AppState>>) -> Result<impl
     
     let backups_dir = PathBuf::from("./data/backups");
     if !backups_dir.exists() {
-        std::fs::create_dir_all(&backups_dir).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        std::fs::create_dir_all(&backups_dir).map_err(|e| e.to_string())?;
     }
     
     let temp_path = backups_dir.join(&temp_filename);
@@ -68,6 +77,7 @@ pub async fn backup_workspace(State(state): State<Arc<AppState>>) -> Result<impl
 
     let temp_path_clone = temp_path.clone();
     let final_path_clone = final_path.clone();
+    let zip_filename_clone = zip_filename.clone();
     
     let zip_result = tokio::task::spawn_blocking(move || -> Result<(), String> {
         let file = File::create(&temp_path_clone).map_err(|e| format!("Failed creating temp zip: {}", e))?;
@@ -80,10 +90,17 @@ pub async fn backup_workspace(State(state): State<Arc<AppState>>) -> Result<impl
         zip_writer.write_all(db_json_str.as_bytes()).map_err(|e| e.to_string())?;
         
         let mut manifest_assets = serde_json::Map::new();
+        let mut processed_hashes = std::collections::HashSet::new();
         
         // Write physical assets
         for asset in assets_list {
             let hash = asset.get("hash").unwrap().as_str().unwrap();
+            
+            if processed_hashes.contains(hash) {
+                continue;
+            }
+            processed_hashes.insert(hash.to_string());
+            
             let relative_path = asset.get("relative_path").unwrap().as_str().unwrap();
             let size_bytes = asset.get("size_bytes").unwrap().as_i64().unwrap();
             let mime_type = asset.get("mime_type").unwrap().as_str().unwrap();
@@ -135,14 +152,13 @@ pub async fn backup_workspace(State(state): State<Arc<AppState>>) -> Result<impl
         std::fs::rename(&temp_path_clone, &final_path_clone).map_err(|e| e.to_string())?;
         
         Ok(())
-    }).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }).await.map_err(|_| "Tokio join error".to_string())?;
 
     match zip_result {
-        Ok(_) => Ok(Json(json!({ "ok": true, "filename": zip_filename }))),
+        Ok(_) => Ok(zip_filename),
         Err(msg) => {
             let _ = std::fs::remove_file(&temp_path);
-            eprintln!("Backup failed: {}", msg);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
+            Err(msg)
         }
     }
 }
