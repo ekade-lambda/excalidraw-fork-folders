@@ -60,9 +60,9 @@ export interface BoardBootResult {
   createdRoot: boolean;
 }
 
-function hasLegacyState(): boolean {
+export function hasLegacyState(): boolean {
   try {
-    return window.localStorage.getItem(LEGACY_ELEMENTS_KEY) != null;
+    return window.localStorage.getItem(LEGACY_ELEMENTS_KEY) != null && window.localStorage.getItem('BOARD_SYSTEM_MIGRATED') !== 'true';
   } catch {
     return false;
   }
@@ -176,6 +176,7 @@ export async function initializeBoardSystem(
       }
     }
 
+    window.localStorage.setItem("BOARD_SYSTEM_MIGRATED", "true");
     commitState(rootBoardId, rootFolderId, boardData);
     return {
       graph,
@@ -224,7 +225,8 @@ export async function initializeBoardSystem(
       console.warn('Fase 8.1: No se pudo limpiar IndexedDB tras migración concurrente', e);
     }
     
-    commitState(boardId, folderId, boardData);
+    window.localStorage.setItem("BOARD_SYSTEM_MIGRATED", "true");
+  commitState(boardId, folderId, boardData);
     return {
       graph: existing,
       currentBoardId: boardId,
@@ -254,6 +256,7 @@ export async function initializeBoardSystem(
     );
   }
   const folderId = existing.boards[boardId].rootFolderId;
+  window.localStorage.setItem("BOARD_SYSTEM_MIGRATED", "true");
   commitState(boardId, folderId, boardData);
   return {
     graph: existing,
@@ -287,7 +290,9 @@ export function loadBoardIntoEditor(
 
   const files = Object.values(boardData.files);
   if (files.length) {
-    const normalizedFiles = files.map((f) => {
+    const normalizedFiles = files
+      .filter((f) => f && f.dataURL)
+      .map((f) => {
       if (
         f.mimeType === "image/svg+xml" &&
         f.dataURL.startsWith("data:image/svg+xml;charset=utf-8,")

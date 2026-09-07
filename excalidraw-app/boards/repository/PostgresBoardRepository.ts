@@ -30,6 +30,9 @@ export class PostgresBoardRepository implements BoardRepository {
   }
 
   async loadBoard(boardId: BoardId): Promise<BoardData | null> {
+    if (!boardId) return null;
+    if (!boardId) { console.error('EMPTY BOARD ID LOADBOARD', new Error().stack); }
+console.log("FETCHING API BOARDS:", boardId);
     const res = await fetch(`${BRIDGE_URL}/api/boards/${boardId}`);
     if (!res.ok) {
       if (res.status === 404) return null;
@@ -40,6 +43,9 @@ export class PostgresBoardRepository implements BoardRepository {
   }
 
   async saveBoard(boardData: BoardData): Promise<void> {
+    if (!boardData.boardId) throw new Error("Cannot save board with empty ID");
+    if (!boardData.boardId) { console.error('EMPTY BOARD ID SAVEBOARD', new Error().stack); }
+console.log("FETCHING API BOARDS:", boardData.boardId);
     const res = await fetch(`${BRIDGE_URL}/api/boards/${boardData.boardId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -49,6 +55,8 @@ export class PostgresBoardRepository implements BoardRepository {
   }
 
   async deleteBoard(boardId: BoardId): Promise<void> {
+    if (!boardId) return;
+console.log("FETCHING API BOARDS:", boardId);
     const res = await fetch(`${BRIDGE_URL}/api/boards/${boardId}`, {
       method: "DELETE",
     });
@@ -113,6 +121,7 @@ export class PostgresBoardRepository implements BoardRepository {
       plainMap[oldId] = newId;
     }
 
+console.log("FETCHING API BOARDS:", "");
     const res = await fetch(`${BRIDGE_URL}/api/boards/clone`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

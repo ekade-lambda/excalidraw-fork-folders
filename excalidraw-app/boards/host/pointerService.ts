@@ -1,3 +1,4 @@
+import { restoreElements, restoreAppState } from "@excalidraw/excalidraw/data/restore";
 /**
  * Board System — host / pointerService (Fase 6).
  *
@@ -70,7 +71,7 @@ export async function createPointerInCanvas(opts: {
   const elements = opts.excalidrawAPI.getSceneElementsIncludingDeleted();
 
   opts.excalidrawAPI.updateScene({
-    elements: [...elements, visual.primary, visual.text],
+    elements: restoreElements([...elements, visual.primary, visual.text], null, { repairBindings: true }),
     captureUpdate: CaptureUpdateAction.IMMEDIATELY,
   });
 }

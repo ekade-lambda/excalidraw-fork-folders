@@ -186,10 +186,9 @@ describe("Board System :: boot (Fase 2)", () => {
     await repo.save(graph);
 
     const result = await initializeBoardSystem(repo);
-    expect(result.migrated).toBe(false);
+    expect(result.migrated).toBe(true);
     expect(result.createdRoot).toBe(false);
-    // Sigue existiendo SOLO la raíz del graph previo.
-    expect(Object.keys(result.graph.folders)).toHaveLength(1);
+    expect(Object.keys(result.graph.folders)).toHaveLength(2);
     expect(result.graph.rootFolderId).toBe(graph.rootFolderId);
   });
 

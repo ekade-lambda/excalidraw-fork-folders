@@ -1,3 +1,4 @@
+import { restoreElements, restoreAppState } from "@excalidraw/excalidraw/data/restore";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { pickFile } from "../bridgeClient";
 import type { LinkToFileData } from "../types";

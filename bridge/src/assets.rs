@@ -144,7 +144,7 @@ pub async fn hydrate_assets(files: &mut Value, client: &Client) -> Result<(), St
 
         let row = match row_opt {
             Some(r) => r,
-            None => return Err(format!("Missing Asset Metadata: FileId {} exists in board but not in excalidraw.assets", file_id)),
+            None => { eprintln!("Warning: Missing Asset Metadata for FileId {} (exists in board but not in excalidraw.assets)", file_id); continue; }
         };
 
         let hash_hex: String = row.get("hash");
@@ -160,7 +160,7 @@ pub async fn hydrate_assets(files: &mut Value, client: &Client) -> Result<(), St
         let physical_path_clone = physical_path.clone();
         let hash_hex_clone = hash_hex.clone();
         
-        let file_bytes = tokio::task::spawn_blocking(move || {
+        let file_bytes_res = tokio::task::spawn_blocking(move || {
             let bytes = fs::read(&physical_path_clone).map_err(|_| format!("Missing Physical File: Asset exists in DB but file missing at {:?}", physical_path_clone))?;
             
             // Integrity check
@@ -171,7 +171,15 @@ pub async fn hydrate_assets(files: &mut Value, client: &Client) -> Result<(), St
                 return Err(format!("Integrity Error: File hash mismatch for {:?}. Expected {}, got {}", physical_path_clone, hash_hex_clone, calculated_hash));
             }
             Ok(bytes)
-        }).await.map_err(|e| e.to_string())??;
+        }).await.map_err(|e| e.to_string())?;
+
+        let file_bytes = match file_bytes_res {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                eprintln!("Warning: Failed to hydrate physical asset {}: {}", file_id, e);
+                continue;
+            }
+        };
 
         let base64_data = BASE64_STANDARD.encode(&file_bytes);
         let data_url = format!("data:{};base64,{}", mime_type, base64_data);

@@ -1,3 +1,4 @@
+import { restoreElements, restoreAppState } from "@excalidraw/excalidraw/data/restore";
 ﻿/**
  * Board System — host / folderService (Fase 3).
  *

@@ -158,7 +158,7 @@ import { sessionClipboardAtom } from "./boards/clipboard";
 import { handleOnCopy } from "./boards/host/copy";
 import { handleOnPaste } from "./boards/host/paste";
 
-import { initializeBoardSystem } from "./boards/host/boardService";
+import { initializeBoardSystem, loadBoardIntoEditor } from "./boards/host/boardService";
 import { startMultiTabSync } from "./boards/host/reconciliation";
 import { PostgresBoardRepository } from "./boards/repository/PostgresBoardRepository";
 import { createFolder } from "./boards/host/folderService";
@@ -519,6 +519,7 @@ const ExcalidrawWrapper = () => {
     initializeBoardSystem(repo)
       .then((bootResult) => {
         if (bootResult && excalidrawAPI) {
+          if (bootResult.boardData) loadBoardIntoEditor(excalidrawAPI, bootResult.boardData);
           import("./boards/host/reconciliation").then((m) => {
             m.reconcilePointerNamesInEditor(bootResult.graph, excalidrawAPI);
           });
