@@ -1,4 +1,4 @@
-﻿import type { ExcalidrawElement } from "@excalidraw/element/types";
+import type { ExcalidrawElement } from "@excalidraw/element/types";
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
@@ -171,6 +171,10 @@ export function startMultiTabSync(
   excalidrawAPI: ExcalidrawImperativeAPI,
 ): () => void {
   const handler = (e: StorageEvent) => {
+    if (boardsStoreActions.getBootState() !== "ready") {
+      return;
+    }
+
     if (e.key !== STORAGE_KEYS.BOARDS_GRAPH) {
       return;
     }

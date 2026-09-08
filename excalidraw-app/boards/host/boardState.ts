@@ -17,7 +17,9 @@ import type { BoardData, BoardId, FolderId, NavigationHistory } from "../types";
 export const currentBoardIdAtom = atom<BoardId | null>(null);
 export const currentFolderIdAtom = atom<FolderId | null>(null);
 export const boardDataAtom = atom<BoardData | null>(null);
-export const boardsReadyAtom = atom<boolean>(false);
+export type BootState = "booting" | "ready" | "failed";
+export const bootStateAtom = atom<BootState>("booting");
+export const bootErrorAtom = atom<any>(null);
 export const graphVersionAtom = atom<number>(0);
 
 /** Historial de navegación (Fase 5). */
@@ -34,14 +36,21 @@ export const boardsStoreActions = {
     appJotaiStore.set(currentFolderIdAtom, id),
   setBoardData: (data: BoardData | null) =>
     appJotaiStore.set(boardDataAtom, data),
-  setReady: (ready: boolean) => appJotaiStore.set(boardsReadyAtom, ready),
+  
+  setBootState: (state: BootState) => appJotaiStore.set(bootStateAtom, state),
+  getBootState: () => appJotaiStore.get(bootStateAtom),
+  setBootError: (error: any) => appJotaiStore.set(bootErrorAtom, error),
+
+  // Backwards compatibility
+  setReady: (ready: boolean) => appJotaiStore.set(bootStateAtom, ready ? "ready" : "booting"),
+  getReady: () => appJotaiStore.get(bootStateAtom) === "ready",
+
   incrementGraphVersion: () =>
     appJotaiStore.set(graphVersionAtom, (v) => v + 1),
 
   getCurrentBoardId: () => appJotaiStore.get(currentBoardIdAtom),
   getCurrentFolderId: () => appJotaiStore.get(currentFolderIdAtom),
   getBoardData: () => appJotaiStore.get(boardDataAtom),
-  getReady: () => appJotaiStore.get(boardsReadyAtom),
 
   setNavigationHistory: (history: NavigationHistory) =>
     appJotaiStore.set(navigationHistoryAtom, history),
@@ -54,8 +63,17 @@ export const useBoardsState = () => {
     currentBoardId: useAtomValue(currentBoardIdAtom),
     currentFolderId: useAtomValue(currentFolderIdAtom),
     boardData: useAtomValue(boardDataAtom),
-    ready: useAtomValue(boardsReadyAtom),
+    ready: useAtomValue(bootStateAtom) === "ready",
+    bootState: useAtomValue(bootStateAtom),
+    bootError: useAtomValue(bootErrorAtom),
     navigationHistory: useAtomValue(navigationHistoryAtom),
     graphVersion: useAtomValue(graphVersionAtom),
   };
 };
+
+/** Guardia de seguridad para impedir operaciones normales si el sistema no está ready */
+export function assertBoardReady() {
+  if (boardsStoreActions.getBootState() !== "ready") {
+    throw new Error("Board system is not ready");
+  }
+}

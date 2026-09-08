@@ -158,7 +158,7 @@ import { sessionClipboardAtom } from "./boards/clipboard";
 import { handleOnCopy } from "./boards/host/copy";
 import { handleOnPaste } from "./boards/host/paste";
 
-import { initializeBoardSystem, loadBoardIntoEditor } from "./boards/host/boardService";
+import { initializeBoardSystem, loadBoardIntoEditor, commitState } from "./boards/host/boardService";
 import { startMultiTabSync } from "./boards/host/reconciliation";
 import { PostgresBoardRepository } from "./boards/repository/PostgresBoardRepository";
 import { createFolder } from "./boards/host/folderService";
@@ -515,18 +515,29 @@ const ExcalidrawWrapper = () => {
     if (!excalidrawAPI) {
       return;
     }
+    boardsStoreActions.setBootState("booting");
+    boardsStoreActions.setBootError(null);
     const repo = new PostgresBoardRepository();
     initializeBoardSystem(repo)
-      .then((bootResult) => {
+      .then(async (bootResult) => {
         if (bootResult && excalidrawAPI) {
-          if (bootResult.boardData) loadBoardIntoEditor(excalidrawAPI, bootResult.boardData);
-          import("./boards/host/reconciliation").then((m) => {
-            m.reconcilePointerNamesInEditor(bootResult.graph, excalidrawAPI);
-          });
+          if (bootResult.boardData) {
+            loadBoardIntoEditor(excalidrawAPI, bootResult.boardData);
+          }
+          const m = await import("./boards/host/reconciliation");
+          m.reconcilePointerNamesInEditor(bootResult.graph, excalidrawAPI);
+
+          commitState(
+            bootResult.currentBoardId,
+            bootResult.currentFolderId,
+            bootResult.boardData,
+          );
         }
       })
       .catch((error) => {
         console.error("BoardSystem: boot failed", error);
+        boardsStoreActions.setBootState("failed");
+        boardsStoreActions.setBootError(error);
       });
 
     const gcTimer = setTimeout(() => {

@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import JSZip from 'jszip';
 
-const BRIDGE_URL = process.env.VITE_BRIDGE_URL || `${BRIDGE_URL}`;
+const BRIDGE_URL = process.env.VITE_BRIDGE_URL || "http://127.0.0.1:3006";
 const BACKUPS_DIR = path.join(process.env.TEST_DATA_DIR || path.join(__dirname, '../../../bridge/data'), 'backups');
 const API_URL = `${BRIDGE_URL}/api/backup-retention`;
 

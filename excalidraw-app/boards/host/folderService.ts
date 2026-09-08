@@ -21,7 +21,7 @@ import type { ExcalidrawTextElement } from "@excalidraw/element/types";
 import { addFolder } from "../domain/graph";
 import { prepareDeleteFolderPatch, applyDeletePatch } from "../domain/delete";
 
-import { boardsStoreActions } from "./boardState";
+import { boardsStoreActions, assertBoardReady } from "./boardState";
 import { saveCurrentBoard } from "./boardService";
 import { buildFolderVisual, findFolderVisual } from "./materialize";
 
@@ -45,6 +45,7 @@ export async function createFolder(opts: {
   sceneX: number;
   sceneY: number;
 }): Promise<CreateFolderResult> {
+  assertBoardReady();
   const { repo, excalidrawAPI, parentFolderId, sceneX, sceneY } = opts;
 
   const graph = await repo.load();
@@ -134,6 +135,7 @@ export async function renameFolder(opts: {
   folderId: FolderId;
   newName: string;
 }): Promise<{ ok: boolean; reason?: string }> {
+  assertBoardReady();
   const { repo, excalidrawAPI, folderId, newName } = opts;
 
   // 1. Update domain graph
@@ -204,6 +206,7 @@ export async function deleteFolder(opts: {
   excalidrawAPI: ExcalidrawImperativeAPI;
   folderId: FolderId;
 }): Promise<{ ok: boolean; reason?: string }> {
+  assertBoardReady();
   const { repo, excalidrawAPI, folderId } = opts;
 
   // 1. Cargar el graph actual

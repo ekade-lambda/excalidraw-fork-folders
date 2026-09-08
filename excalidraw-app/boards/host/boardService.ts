@@ -32,7 +32,7 @@ import { STORAGE_KEYS } from "../../app_constants";
 
 import { BOARD_SYSTEM_SCHEMA_VERSION } from "../types";
 
-import { boardsStoreActions } from "./boardState";
+import { boardsStoreActions, assertBoardReady } from "./boardState";
 import {
   navigateToHistory,
   initializeHistory,
@@ -123,7 +123,7 @@ async function createRoot(repo: BoardRepository) {
 }
 
 /** Aplica el estado del boot al store jotai de la app. */
-function commitState(
+export function commitState(
   currentBoardId: BoardId,
   currentFolderId: FolderId,
   boardData: BoardData | null,
@@ -131,7 +131,7 @@ function commitState(
   boardsStoreActions.setCurrentBoardId(currentBoardId);
   boardsStoreActions.setCurrentFolderId(currentFolderId);
   boardsStoreActions.setBoardData(boardData);
-  boardsStoreActions.setReady(true);
+  boardsStoreActions.setBootState("ready");
   // Registrar el entry inicial en el historial de navegación (Fase 5).
   const entry: NavEntry = {
     kind: "folder",
@@ -177,7 +177,7 @@ export async function initializeBoardSystem(
     }
 
     window.localStorage.setItem("BOARD_SYSTEM_MIGRATED", "true");
-    commitState(rootBoardId, rootFolderId, boardData);
+    // Eliminado: commitState(rootBoardId, rootFolderId, boardData); (Microfase 1)
     return {
       graph,
       currentBoardId: rootBoardId,
@@ -226,7 +226,7 @@ export async function initializeBoardSystem(
     }
     
     window.localStorage.setItem("BOARD_SYSTEM_MIGRATED", "true");
-  commitState(boardId, folderId, boardData);
+    // Eliminado: commitState(boardId, folderId, boardData); (Microfase 1)
     return {
       graph: existing,
       currentBoardId: boardId,
@@ -257,7 +257,7 @@ export async function initializeBoardSystem(
   }
   const folderId = existing.boards[boardId].rootFolderId;
   window.localStorage.setItem("BOARD_SYSTEM_MIGRATED", "true");
-  commitState(boardId, folderId, boardData);
+  // Eliminado: commitState(boardId, folderId, boardData); (Microfase 1)
   return {
     graph: existing,
     currentBoardId: boardId,
@@ -323,6 +323,7 @@ export async function saveCurrentBoard(
   repo: BoardRepository,
   boardId: BoardId,
 ): Promise<void> {
+  assertBoardReady();
   const currentName = excalidrawAPI.getName();
   
   const data: BoardData = {
@@ -369,6 +370,7 @@ async function openFolderInternal(opts: {
   excalidrawAPI: ExcalidrawImperativeAPI;
   folderId: FolderId;
 }): Promise<{ ok: boolean; reason?: string }> {
+  assertBoardReady();
   const { repo, excalidrawAPI, folderId } = opts;
 
   // 1. Persistir el board actual (la escena que está en el editor).
@@ -430,7 +432,6 @@ async function openFolderInternal(opts: {
   boardsStoreActions.setCurrentBoardId(boardId);
   boardsStoreActions.setCurrentFolderId(folderId);
   boardsStoreActions.setBoardData(boardData);
-  boardsStoreActions.setReady(true);
 
   // 7. Persistir lastOpenBoardId para restaurar en el próximo boot.
   graph.lastOpenBoardId = boardId;
