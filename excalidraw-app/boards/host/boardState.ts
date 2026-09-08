@@ -22,6 +22,9 @@ export const bootStateAtom = atom<BootState>("booting");
 export const bootErrorAtom = atom<any>(null);
 export const graphVersionAtom = atom<number>(0);
 
+export type HydrationState = "complete" | "partial";
+export const hydrationStateAtom = atom<HydrationState>("complete");
+
 /** Historial de navegación (Fase 5). */
 export const navigationHistoryAtom = atom<NavigationHistory>({
   back: [],
@@ -40,6 +43,9 @@ export const boardsStoreActions = {
   setBootState: (state: BootState) => appJotaiStore.set(bootStateAtom, state),
   getBootState: () => appJotaiStore.get(bootStateAtom),
   setBootError: (error: any) => appJotaiStore.set(bootErrorAtom, error),
+
+  setHydrationState: (state: HydrationState) => appJotaiStore.set(hydrationStateAtom, state),
+  getHydrationState: () => appJotaiStore.get(hydrationStateAtom),
 
   // Backwards compatibility
   setReady: (ready: boolean) => appJotaiStore.set(bootStateAtom, ready ? "ready" : "booting"),

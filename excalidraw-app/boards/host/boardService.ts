@@ -122,6 +122,19 @@ async function createRoot(repo: BoardRepository) {
   return { graph, rootFolderId, rootBoardId };
 }
 
+/** Helper to evaluate if the board was fully hydrated from backend */
+function calculateHydrationState(boardData: BoardData | null): "complete" | "partial" {
+  if (!boardData || !boardData.files) {
+    return "complete";
+  }
+  for (const file of Object.values(boardData.files)) {
+    if (file && !(file as any).dataURL) {
+      return "partial";
+    }
+  }
+  return "complete";
+}
+
 /** Aplica el estado del boot al store jotai de la app. */
 export function commitState(
   currentBoardId: BoardId,
@@ -131,6 +144,7 @@ export function commitState(
   boardsStoreActions.setCurrentBoardId(currentBoardId);
   boardsStoreActions.setCurrentFolderId(currentFolderId);
   boardsStoreActions.setBoardData(boardData);
+  boardsStoreActions.setHydrationState(calculateHydrationState(boardData));
   boardsStoreActions.setBootState("ready");
   // Registrar el entry inicial en el historial de navegación (Fase 5).
   const entry: NavEntry = {
@@ -324,6 +338,12 @@ export async function saveCurrentBoard(
   boardId: BoardId,
 ): Promise<void> {
   assertBoardReady();
+
+  if (boardsStoreActions.getHydrationState() === "partial") {
+    console.warn(`saveCurrentBoard: Bloqueado por hidratación parcial (Board: ${boardId})`);
+    return;
+  }
+
   const currentName = excalidrawAPI.getName();
   
   const data: BoardData = {
@@ -432,6 +452,7 @@ async function openFolderInternal(opts: {
   boardsStoreActions.setCurrentBoardId(boardId);
   boardsStoreActions.setCurrentFolderId(folderId);
   boardsStoreActions.setBoardData(boardData);
+  boardsStoreActions.setHydrationState(calculateHydrationState(boardData));
 
   // 7. Persistir lastOpenBoardId para restaurar en el próximo boot.
   graph.lastOpenBoardId = boardId;
