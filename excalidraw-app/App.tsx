@@ -162,7 +162,7 @@ import { initializeBoardSystem, loadBoardIntoEditor, commitState } from "./board
 import { startMultiTabSync } from "./boards/host/reconciliation";
 import { PostgresBoardRepository } from "./boards/repository/PostgresBoardRepository";
 import { createFolder } from "./boards/host/folderService";
-import { boardsStoreActions } from "./boards/host/boardState";
+import { boardsStoreActions, useBoardsState } from "./boards/host/boardState";
 import { openFolder } from "./boards/host/boardService";
 import { hitTestFolderAtPoint } from "./boards/host/hitTest";
 import { renameFolder, deleteFolder } from "./boards/host/folderService";
@@ -408,8 +408,10 @@ const initializeScene = async (opts: {
   return { scene: null, isExternalScene: false };
 };
 
-const ExcalidrawWrapper = () => {
+export const ExcalidrawWrapper = () => {
   const excalidrawAPI = useExcalidrawAPI();
+  const { bootState, bootError } = useBoardsState();
+  const isEditorBlocked = bootState !== "ready";
 
   const [errorMessage, setErrorMessage] = useState("");
   const isCollabDisabled = isRunningInIframe();
@@ -1337,15 +1339,48 @@ const ExcalidrawWrapper = () => {
 
   return (
     <div
-      style={{ height: "100%" }}
+      style={{ height: "100%", position: "relative" }}
       className={clsx("excalidraw-app", {
         "is-collaborating": isCollaborating,
       })}
       onDoubleClickCapture={handleCanvasDoubleClickCapture}
       onDoubleClick={handleCanvasDoubleClick}
       onContextMenu={handleHostContextMenu}
+      onPointerDownCapture={(e) => { if (isEditorBlocked) { e.stopPropagation(); e.preventDefault(); } }}
+      onWheelCapture={(e) => { if (isEditorBlocked) { e.stopPropagation(); e.preventDefault(); } }}
+      onDropCapture={(e) => { if (isEditorBlocked) { e.stopPropagation(); e.preventDefault(); } }}
+      onPasteCapture={(e) => { if (isEditorBlocked) { e.stopPropagation(); e.preventDefault(); } }}
     >
+      {isEditorBlocked && (
+        <div
+          className="boot-blocking-overlay"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 999999,
+            backgroundColor: "var(--color-bg-1, rgba(255, 255, 255, 0.9))",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "all",
+          }}
+        >
+          <h2 style={{ color: "var(--color-text-1)" }}>
+            {bootState === "booting" ? "Cargando tablero..." : "No se pudo cargar el tablero."}
+          </h2>
+          {bootState === "failed" && bootError && (
+            <p style={{ color: "var(--color-danger)", marginTop: "1rem", maxWidth: "80%", textAlign: "center" }}>
+              {String(bootError?.message || bootError)}
+            </p>
+          )}
+        </div>
+      )}
       <Excalidraw
+        viewModeEnabled={isEditorBlocked}
         viewportStatusFrame={viewportStatusFrame}
         userToFollow={userToFollow}
         onChange={onChange}
