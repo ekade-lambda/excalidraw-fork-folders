@@ -3,8 +3,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import JSZip from 'jszip';
 
-const BACKUPS_DIR = path.join(__dirname, '../../../bridge/data/backups');
-const API_URL = 'http://127.0.0.1:3005/api/backup-retention';
+const BRIDGE_URL = process.env.VITE_BRIDGE_URL || `${BRIDGE_URL}`;
+const BACKUPS_DIR = path.join(process.env.TEST_DATA_DIR || path.join(__dirname, '../../../bridge/data'), 'backups');
+const API_URL = `${BRIDGE_URL}/api/backup-retention`;
 
 function formatDateForBackup(date: Date): string {
     const pad = (n: number) => n.toString().padStart(2, '0');
@@ -57,6 +58,7 @@ async function cleanBackupsDir() {
 describe('Fase 11.3 - Backup Retention Tests', () => {
 
     beforeAll(async () => {
+        await fetch(`${BRIDGE_URL}/api/debug/reset`, { method: 'POST' });
         await cleanBackupsDir();
     });
 
@@ -156,8 +158,8 @@ describe('Fase 11.3 - Backup Retention Tests', () => {
     it('Test 6: Dos backups en el mismo segundo no colisionan', async () => {
         await cleanBackupsDir();
         
-        const req1 = fetch('http://127.0.0.1:3005/api/backup', { method: 'POST' });
-        const req2 = fetch('http://127.0.0.1:3005/api/backup', { method: 'POST' });
+        const req1 = fetch(`${BRIDGE_URL}/api/backup`, { method: 'POST' });
+        const req2 = fetch(`${BRIDGE_URL}/api/backup`, { method: 'POST' });
         
         const [res1, res2] = await Promise.all([req1, req2]);
         const data1 = await res1.json();

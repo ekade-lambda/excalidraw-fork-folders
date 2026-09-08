@@ -1,3 +1,4 @@
+const BRIDGE_URL = process.env.VITE_BRIDGE_URL || "http://127.0.0.1:3005";
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { PostgresBoardRepository } from '../../boards/repository/PostgresBoardRepository';
 import { initializeBoardSystem } from '../../boards/host/boardService';
@@ -6,8 +7,9 @@ import 'fake-indexeddb/auto';
 import fs from 'fs';
 import path from 'path';
 
-const BACKUPS_DIR = path.resolve(__dirname, '../../../bridge/data/backups');
-const ASSETS_DIR = path.resolve(__dirname, '../../../bridge/data/assets');
+const DATA_DIR_BASE = process.env.TEST_DATA_DIR || path.resolve(__dirname, '../../../bridge/data');
+const BACKUPS_DIR = path.join(DATA_DIR_BASE, 'backups');
+const ASSETS_DIR = path.join(DATA_DIR_BASE, 'assets');
 
 describe('Fase 10 - Restore', () => {
   let repo: PostgresBoardRepository;
@@ -18,7 +20,7 @@ describe('Fase 10 - Restore', () => {
     const myClear: any = clear;
     await myClear(store);
     
-    await fetch('http://127.0.0.1:3005/api/debug/reset', { method: 'POST' });
+    await fetch(`${BRIDGE_URL}/api/debug/reset`, { method: 'POST' });
     if (fs.existsSync(BACKUPS_DIR)) fs.rmSync(BACKUPS_DIR, { recursive: true, force: true });
     if (fs.existsSync(ASSETS_DIR)) fs.rmSync(ASSETS_DIR, { recursive: true, force: true });
     
@@ -35,24 +37,24 @@ describe('Fase 10 - Restore', () => {
       { id: 'boardA', type: 'rectangle', fileId: 'fileA' }
     ]));
     const store = createStore('files-db', 'files-store');
-    await set('fileA', { id: 'fileA', dataURL: 'data:image/png;base64,A', mimeType: 'image/png', created: 1 }, store);
+    await set('fileA', { id: 'fileA', dataURL: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', mimeType: 'image/png', created: 1 }, store);
     await initializeBoardSystem(repo);
     
     // Generar Backup de datos A
-    const resBackup = await fetch('http://127.0.0.1:3005/api/backup', { method: 'POST' });
+    const resBackup = await fetch(`${BRIDGE_URL}/api/backup`, { method: 'POST' });
     const backupResult = await resBackup.json();
     const backupZipPath = path.join(BACKUPS_DIR, backupResult.filename);
     const backupZipBytes = fs.readFileSync(backupZipPath);
     
     // 2. Sobrescribir workspace actual con datos B
-    await fetch('http://127.0.0.1:3005/api/debug/reset', { method: 'POST' });
+    await fetch(`${BRIDGE_URL}/api/debug/reset`, { method: 'POST' });
     window.localStorage.setItem('excalidraw', JSON.stringify([
       { id: 'boardB', type: 'ellipse' }
     ]));
     await initializeBoardSystem(repo);
     
     // 3. Ejecutar Restore usando el ZIP de A
-    const resRestore = await fetch('http://127.0.0.1:3005/api/restore', {
+    const resRestore = await fetch(`${BRIDGE_URL}/api/restore`, {
       method: 'POST',
       body: backupZipBytes as unknown as BodyInit
     });
@@ -68,13 +70,18 @@ describe('Fase 10 - Restore', () => {
     const boardGraph = await repo.load();
     expect(boardGraph).not.toBeNull();
     const parsed = boardGraph as any;
-    expect(parsed.elements[0].id).toBe('boardA');
-    expect(parsed.files['fileA']).toBeDefined();
+    
+    // After restore, the lastOpenBoardId is "boardA"
+    const boardRes = await fetch(`${BRIDGE_URL}/api/boards/${parsed.lastOpenBoardId}`);
+    const boardData = await boardRes.json();
+    
+    expect(boardData.elements[0].id).toBe('boardA');
+    expect(boardData.files['fileA']).toBeDefined();
   });
 
   it('2. Rechaza archivos ZIP corruptos / aleatorios y protege la DB', async () => {
     const randomBytes = new Uint8Array([0, 1, 2, 3, 4, 5, 6]);
-    const res = await fetch('http://127.0.0.1:3005/api/restore', {
+    const res = await fetch(`${BRIDGE_URL}/api/restore`, {
       method: 'POST',
       body: randomBytes as unknown as BodyInit
     });
@@ -91,7 +98,7 @@ describe('Fase 10 - Restore', () => {
       assets: []
     }));
     const content = await zip.generateAsync({ type: "nodebuffer" });
-    const res = await fetch('http://127.0.0.1:3005/api/restore', { method: 'POST', body: content as unknown as BodyInit });
+    const res = await fetch(`${BRIDGE_URL}/api/restore`, { method: 'POST', body: content as unknown as BodyInit });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(400);
   });
@@ -105,7 +112,7 @@ describe('Fase 10 - Restore', () => {
       assets: []
     }));
     const content = await zip.generateAsync({ type: "nodebuffer" });
-    const res = await fetch('http://127.0.0.1:3005/api/restore', { method: 'POST', body: content as unknown as BodyInit });
+    const res = await fetch(`${BRIDGE_URL}/api/restore`, { method: 'POST', body: content as unknown as BodyInit });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(400);
   });
@@ -119,7 +126,7 @@ describe('Fase 10 - Restore', () => {
       assets: [{ hash: "deadbeef", size_bytes: 60 * 1024 * 1024, relative_path: "fake" }]
     }));
     const content = await zip.generateAsync({ type: "nodebuffer" });
-    const res = await fetch('http://127.0.0.1:3005/api/restore', { method: 'POST', body: content as unknown as BodyInit });
+    const res = await fetch(`${BRIDGE_URL}/api/restore`, { method: 'POST', body: content as unknown as BodyInit });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(400);
   });
@@ -136,8 +143,8 @@ describe('Fase 10 - Restore', () => {
     
     const content = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 9 } });
     
-    const res = await fetch('http://127.0.0.1:3005/api/restore', { method: 'POST', body: content as unknown as BodyInit });
+    const res = await fetch(`${BRIDGE_URL}/api/restore`, { method: 'POST', body: content as unknown as BodyInit });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(400);
-  });
+  }, 30000);
 });

@@ -48,7 +48,8 @@ async fn restore_workspace_inner(state: Arc<AppState>, bytes: Bytes) -> Result<s
         }
     }
 
-    let backups_dir = PathBuf::from("./data/backups");
+    let data_dir = std::env::var("DATA_DIR").unwrap_or_else(|_| "./data".to_string());
+    let backups_dir = PathBuf::from(&data_dir).join("backups");
     if !backups_dir.exists() {
         std::fs::create_dir_all(&backups_dir).map_err(|e| e.to_string())?;
     }
@@ -62,7 +63,7 @@ async fn restore_workspace_inner(state: Arc<AppState>, bytes: Bytes) -> Result<s
         file.write_all(&bytes).map_err(|e| format!("Failed to write temp zip: {}", e))?;
     }
     
-    let staging_dir = PathBuf::from(format!("./data/.restore_staging_{}", Uuid::new_v4()));
+    let staging_dir = PathBuf::from(&data_dir).join(format!(".restore_staging_{}", Uuid::new_v4()));
     std::fs::create_dir_all(&staging_dir).map_err(|e| e.to_string())?;
     
     let staging_dir_clone = staging_dir.clone();
@@ -218,7 +219,7 @@ async fn restore_workspace_inner(state: Arc<AppState>, bytes: Bytes) -> Result<s
         if let Some(arr) = database.get(table.to_string()).and_then(|v| v.as_array()) {
             if !arr.is_empty() {
                 let json_data = serde_json::to_string(arr).unwrap();
-                let query = format!("INSERT INTO excalidraw.{} SELECT * FROM json_populate_recordset(null::excalidraw.{}, $1::json)", table, table);
+                let query = format!("INSERT INTO excalidraw.{} SELECT * FROM json_populate_recordset(null::excalidraw.{}, ($1::text)::json)", table, table);
                 transaction.execute(&query, &[&json_data]).await.map_err(|e| format!("Failed to insert {}: {}", table, e))?;
             }
         }

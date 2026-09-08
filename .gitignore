@@ -32,3 +32,12 @@ meta*.json
 .env
 bridge/.env
 bridge/target/
+
+# Test Data & Temps
+bridge/data/
+bridge/data_test/
+bridge/target-test/
+data/
+excalidraw-app/before.json
+excalidraw-app/after.json
+snapshot_prod_before.json

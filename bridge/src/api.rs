@@ -472,3 +472,37 @@ pub async fn clone_boards(State(state): State<Arc<AppState>>, Json(req): Json<Cl
     transaction.commit().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(()))
 }
+
+pub async fn reset_endpoint(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<()>, StatusCode> {
+    let db_url = std::env::var("DATABASE_URL").unwrap_or_default();
+    let data_dir = std::env::var("DATA_DIR").unwrap_or_else(|_| "./data".to_string());
+    
+    // Defensa en profundidad
+    if db_url.contains("infinite_notes") && !db_url.contains("infinite_notes_test") {
+        eprintln!("DANGER: DATABASE_URL points to production!");
+        return Err(StatusCode::FORBIDDEN);
+    }
+    if data_dir == "./data" || data_dir.ends_with("/data") || data_dir.ends_with("\\data") {
+        eprintln!("DANGER: DATA_DIR points to production!");
+        return Err(StatusCode::FORBIDDEN);
+    }
+    if std::env::var("IS_TEST_ENV").unwrap_or_default() != "true" {
+        eprintln!("DANGER: IS_TEST_ENV is not true!");
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let pool = state.db_pool.as_ref().ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+    let client = pool.get().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    client.execute("TRUNCATE excalidraw.boards, excalidraw.folders, excalidraw.system_config, excalidraw.assets, excalidraw.pointers CASCADE", &[]).await.map_err(|e| { eprintln!("DB ERROR: {}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
+    
+    // Limpiar filesystem
+    if std::path::Path::new(&data_dir).exists() {
+        let _ = std::fs::remove_dir_all(&data_dir);
+        let _ = std::fs::create_dir_all(&data_dir);
+    }
+    
+    Ok(Json(()))
+}

@@ -2,11 +2,13 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const ASSETS_DIR = path.join(__dirname, '../../../bridge/data/assets');
-const BACKUPS_DIR = path.join(__dirname, '../../../bridge/data/backups');
-const DATA_DIR = path.join(__dirname, '../../../bridge/data');
+const BRIDGE_URL = process.env.VITE_BRIDGE_URL || 'http://127.0.0.1:3005';
+const DATA_DIR_BASE = process.env.TEST_DATA_DIR || path.join(__dirname, '../../../bridge/data');
+const ASSETS_DIR = path.join(DATA_DIR_BASE, 'assets');
+const BACKUPS_DIR = path.join(DATA_DIR_BASE, 'backups');
+const DATA_DIR = DATA_DIR_BASE;
 
-const API_URL = 'http://127.0.0.1:3005/api/gc';
+const API_URL = `${BRIDGE_URL}/api/gc`;
 
 function createMockAsset(hash: string, mtime: number) {
   if (!fs.existsSync(ASSETS_DIR)) fs.mkdirSync(ASSETS_DIR, { recursive: true });
@@ -25,6 +27,10 @@ function createMockTempZip(mtime: number) {
 }
 
 describe('Fase 11.2 - GC Tests', () => {
+
+  beforeAll(async () => {
+    await fetch(`${BRIDGE_URL}/api/debug/reset`, { method: 'POST' });
+  });
 
   it('GC endpoint existe y corre sin fallos (Idempotencia)', async () => {
     const res1 = await fetch(API_URL, { method: 'POST' });

@@ -131,6 +131,7 @@ async fn main() {
         .route("/api/restore", post(restore::restore_workspace))
         .route("/api/gc", post(gc::gc_endpoint))
         .route("/api/backup-retention", post(backup_retention::retention_endpoint))
+        .route("/api/debug/reset", post(api::reset_endpoint))
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024)) // 100 MB limit to allow large image uploads
         .layer(cors)
         .with_state(shared_state.clone());
@@ -139,7 +140,8 @@ async fn main() {
     let interval = std::env::var("SCHEDULER_INTERVAL_SECS").unwrap_or_else(|_| "3600".to_string()).parse().unwrap_or(3600);
     scheduler::start_scheduler(shared_state.clone(), interval);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3005));
+    let port: u16 = std::env::var("BRIDGE_PORT").unwrap_or_else(|_| "3005".to_string()).parse().unwrap_or(3005);
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     println!("Bridge listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();

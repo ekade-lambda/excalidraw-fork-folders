@@ -67,7 +67,7 @@
     "start:production": "yarn --cwd ./excalidraw-app start:production",
     "start:example": "yarn build:packages && yarn --cwd ./examples/with-script-in-browser start",
     "test:all": "yarn test:typecheck && yarn test:code && yarn test:other && yarn test:app --watch=false",
-    "test:app": "vitest",
+    "test:app": "cross-env VITE_BRIDGE_URL=http://127.0.0.1:3006 TEST_DATA_DIR=./bridge/data_test vitest",
     "test:code": "eslint --max-warnings=0 --ext .js,.ts,.tsx .",
     "test:other": "yarn prettier --list-different",
     "test:typecheck": "tsc",

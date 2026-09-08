@@ -1,3 +1,4 @@
+const BRIDGE_URL = process.env.VITE_BRIDGE_URL || "http://127.0.0.1:3005";
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { PostgresBoardRepository } from '../../boards/repository/PostgresBoardRepository';
 import { initializeBoardSystem } from '../../boards/host/boardService';
@@ -5,8 +6,9 @@ import { createStore, clear, set } from 'idb-keyval';
 import 'fake-indexeddb/auto';
 import fs from 'fs';
 import path from 'path';
-const BACKUPS_DIR = path.resolve(__dirname, '../../../bridge/data/backups');
-const ASSETS_DIR = path.resolve(__dirname, '../../../bridge/data/assets');
+const DATA_DIR_BASE = process.env.TEST_DATA_DIR || path.resolve(__dirname, '../../../bridge/data');
+const BACKUPS_DIR = path.join(DATA_DIR_BASE, 'backups');
+const ASSETS_DIR = path.join(DATA_DIR_BASE, 'assets');
 
 describe('Fase 9 - Export / Backup', () => {
   let repo: PostgresBoardRepository;
@@ -18,7 +20,7 @@ describe('Fase 9 - Export / Backup', () => {
     await myClear(store);
     
     // Limpiar BD y Assets para el test
-    await fetch('http://127.0.0.1:3005/api/debug/reset', { method: 'POST' });
+    await fetch(`${BRIDGE_URL}/api/debug/reset`, { method: 'POST' });
     if (fs.existsSync(BACKUPS_DIR)) fs.rmSync(BACKUPS_DIR, { recursive: true, force: true });
     if (fs.existsSync(ASSETS_DIR)) fs.rmSync(ASSETS_DIR, { recursive: true, force: true });
     
@@ -30,9 +32,6 @@ describe('Fase 9 - Export / Backup', () => {
   });
 
   it('1. Exportación de un workspace con boards y assets (deduplicados)', async () => {
-    // 1. Inicializar (vacío)
-    const boot1 = await initializeBoardSystem(repo);
-    
     // 2. Insertar legacy que contenga dos assets repetidos y uno distinto
     const dataURL1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='; // Pixel 1
     const dataURL2 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+BnwAFzADw/Z38HQAAAABJRU5ErkJggg=='; // Pixel 2
@@ -52,7 +51,7 @@ describe('Fase 9 - Export / Backup', () => {
     await initializeBoardSystem(repo);
     
     // Generar backup
-    const res = await fetch('http://127.0.0.1:3005/api/backup', { method: 'POST' });
+    const res = await fetch(`${BRIDGE_URL}/api/backup`, { method: 'POST' });
     expect(res.ok).toBe(true);
     const result = await res.json();
     
@@ -78,7 +77,7 @@ describe('Fase 9 - Export / Backup', () => {
     fs.rmSync(path.join(ASSETS_DIR, files[0]));
     
     // Generar backup
-    const res = await fetch('http://127.0.0.1:3005/api/backup', { method: 'POST' });
+    const res = await fetch(`${BRIDGE_URL}/api/backup`, { method: 'POST' });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(500);
     
