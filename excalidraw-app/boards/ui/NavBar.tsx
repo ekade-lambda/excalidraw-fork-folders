@@ -18,8 +18,14 @@ import {
 } from "../host/boardService";
 import { canGoBack, canGoForward } from "../host/navigation";
 
-import { buildProjectExport, downloadProjectExport } from "../import-export/exportService";
-import { importWorkspace } from "../host/workspace";
+import {
+  buildProjectExport,
+  downloadProjectExport,
+} from "../import-export/exportService";
+import {
+  importProject,
+  validateProjectExport,
+} from "../import-export/importService";
 
 import type { FolderId } from "../types";
 import type { BoardRepository } from "../repository/BoardRepository";
@@ -95,7 +101,7 @@ export const NavBar = ({
   const handleImport = () => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".json,.excaliwork";
+    input.accept = ".json";
     input.onchange = async (e: any) => {
       const file = e.target.files?.[0];
       if (!file) {
@@ -104,21 +110,46 @@ export const NavBar = ({
 
       try {
         const text = await file.text();
+
+        // 2. Parse JSON
+        let parsedJSON: any;
+        try {
+          parsedJSON = JSON.parse(text);
+        } catch (err) {
+          window.alert(
+            "Error de importación: El archivo no es un JSON válido.",
+          );
+          return;
+        }
+
+        // 3. Validar JSON
+        const validation = validateProjectExport(parsedJSON);
+        if (!validation.isValid) {
+          window.alert(
+            `Error de importación: Formato de proyecto inválido. ${validation.error}`,
+          );
+          return;
+        }
+
+        // 4. Confirmación antes de reemplazar
         const confirmed = window.confirm(
-          "WARNING: This will replace your entire workspace. Are you sure you want to proceed?",
+          "El proyecto actual será reemplazado completamente por el proyecto importado.\n\nEsta operación no se puede deshacer.\n\n¿Estás seguro de que deseas proceder con la importación?",
         );
         if (!confirmed) {
           return;
         }
 
-        await importWorkspace(text, repo);
+        // 5. Persistir (Preflight y escrituras)
+        await importProject(repo, parsedJSON);
+
+        // 6. Recargar UI solo si fue exitoso
         window.alert(
-          "Workspace imported successfully! The application will now reload.",
+          "Proyecto importado exitosamente. La aplicación se recargará para mostrar el nuevo proyecto.",
         );
         window.location.reload();
       } catch (err: any) {
         console.error(err);
-        window.alert(`Import failed: ${err.message}`);
+        window.alert(`Error de importación/persistencia: ${err.message}`);
       }
     };
     input.click();

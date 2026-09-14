@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   validateProjectExport,
   importProject,
-  ImportCollisionError,
 } from "./importService";
 import type { BoardsGraph, BoardData } from "../types";
 import { vi } from "vitest";
@@ -207,92 +206,122 @@ describe("importProject persistence", () => {
       lastOpenBoardId: null,
     },
     boardsData: {
-      "b-1": { boardId: "b-1", elements: [], files: {} },
+      "b-1": {
+        boardId: "b-1",
+        elements: [],
+        files: { "file-1": { id: "file-1", dataURL: "data:..." } },
+      },
       "b-2": { boardId: "b-2", elements: [], files: {} },
     },
   };
 
-  it("1. Importación sin colisiones -> comportamiento normal y preflight pasa", async () => {
+  const emptyProjectMock = {
+    graph: {
+      rootFolderId: "f-empty",
+      folders: {},
+      boards: {},
+      pointers: {},
+      lastOpenBoardId: null,
+    },
+    boardsData: {},
+  };
+
+  it("1. Importación normal sin boards previos", async () => {
     const repo = createMockRepo();
-    // Simulate local graph with completely different board IDs
-    (repo.load as any).mockResolvedValue({
-      boards: { "b-99": {} },
-    });
-
-    await importProject(repo, projectMock);
-
-    // Verify order using invocation counts
-    const loadSyncOrder = (repo.load as any).mock.invocationCallOrder;
-    const runWithActiveWritesOrder = (repo.runWithActiveWrites as any).mock
-      .invocationCallOrder;
-
-    // Check that preflight (loadSync) happens BEFORE runWithActiveWrites
-    expect(loadSyncOrder[0]).toBeLessThan(runWithActiveWritesOrder[0]);
+    await importProject(repo, projectMock as any);
 
     expect(repo.runWithActiveWrites).toHaveBeenCalledTimes(1);
     expect(repo.runWithActiveWrites).toHaveBeenCalledWith(
       ["b-1", "b-2"],
       expect.any(Function),
     );
+    expect(repo.saveBoard).toHaveBeenCalledTimes(2);
+    // Verificar preservación de BoardData exacto (incluyendo files)
+    expect(repo.saveBoard).toHaveBeenCalledWith(projectMock.boardsData["b-1"]);
+    expect(repo.saveBoard).toHaveBeenCalledWith(projectMock.boardsData["b-2"]);
+    expect(repo.save).toHaveBeenCalledTimes(1);
+    expect(repo.save).toHaveBeenCalledWith(projectMock.graph);
+    expect(repo.runGarbageCollector).toHaveBeenCalledTimes(1);
+    expect(repo.runGarbageCollector).toHaveBeenCalledWith(projectMock.graph);
+  });
 
+  it("2. Sobrescritura de IDs existentes (local tiene mismos IDs)", async () => {
+    const repo = createMockRepo();
+    (repo.load as any).mockResolvedValue({
+      boards: { "b-1": {}, "b-2": {} }, // Local tiene los mismos tableros
+    });
+
+    // La importación ya no falla por colisión
+    await expect(
+      importProject(repo, projectMock as any),
+    ).resolves.toBeUndefined();
+
+    // Sobrescribe directamente
     expect(repo.saveBoard).toHaveBeenCalledTimes(2);
     expect(repo.save).toHaveBeenCalledTimes(1);
     expect(repo.runGarbageCollector).toHaveBeenCalledTimes(1);
   });
 
-  it("2. Colisión con un BoardId existente -> error específico y aborta sin escribir", async () => {
+  it("3. Reemplazo de proyecto con IDs diferentes (local X/Y, import A/B)", async () => {
     const repo = createMockRepo();
-    // Simulate local graph containing one of the imported boards ("b-1")
     (repo.load as any).mockResolvedValue({
-      boards: { "b-1": {} },
+      boards: { "b-x": {}, "b-y": {} }, // Local viejo
     });
 
-    await expect(importProject(repo, projectMock)).rejects.toThrowError(
-      ImportCollisionError,
-    );
-    await expect(importProject(repo, projectMock)).rejects.toThrow(
-      /El board b-1 ya existe/,
-    );
+    await importProject(repo, projectMock as any);
 
-    expect(repo.runWithActiveWrites).not.toHaveBeenCalled();
-    expect(repo.saveBoard).not.toHaveBeenCalled();
-    expect(repo.save).not.toHaveBeenCalled();
-    expect(repo.runGarbageCollector).not.toHaveBeenCalled();
+    // Escribe los tableros nuevos ("b-1", "b-2")
+    expect(repo.saveBoard).toHaveBeenCalledWith(projectMock.boardsData["b-1"]);
+    expect(repo.saveBoard).toHaveBeenCalledWith(projectMock.boardsData["b-2"]);
+    // Publica el graph con "b-1" y "b-2"
+    expect(repo.save).toHaveBeenCalledWith(projectMock.graph);
+    // Llama al GC con el graph importado (borrará "b-x" y "b-y" físicamente)
+    expect(repo.runGarbageCollector).toHaveBeenCalledWith(projectMock.graph);
   });
 
-  it("3. Colisión entre varios IDs -> error y aborta sin escribir", async () => {
+  it("4. Reimportación del mismo proyecto (importar dos veces consecutivas)", async () => {
     const repo = createMockRepo();
-    // Simulate local graph containing ALL of the imported boards
-    (repo.load as any).mockResolvedValue({
-      boards: { "b-1": {}, "b-2": {} },
-    });
 
-    await expect(importProject(repo, projectMock)).rejects.toThrowError(
-      ImportCollisionError,
-    );
+    await importProject(repo, projectMock as any);
+    expect(repo.saveBoard).toHaveBeenCalledTimes(2);
 
-    expect(repo.saveBoard).not.toHaveBeenCalled();
-    expect(repo.save).not.toHaveBeenCalled();
+    // Segunda importación (sobrescribe in-place)
+    await importProject(repo, projectMock as any);
+    expect(repo.saveBoard).toHaveBeenCalledTimes(4); // 2 + 2
+    expect(repo.save).toHaveBeenCalledTimes(2);
   });
 
-  it("4. Error durante saveBoard -> detiene flujo, no guarda graph ni ejecuta GC", async () => {
+  it("5. Proyecto vacío (importar JSON vacío si el formato lo permite)", async () => {
+    const repo = createMockRepo();
+    await importProject(repo, emptyProjectMock as any);
+
+    // No hay boards para escribir
+    expect(repo.saveBoard).not.toHaveBeenCalled();
+    // Pero el graph vacío se publica como maestro
+    expect(repo.save).toHaveBeenCalledWith(emptyProjectMock.graph);
+    expect(repo.runGarbageCollector).toHaveBeenCalledWith(
+      emptyProjectMock.graph,
+    );
+  });
+
+  it("6. Error durante saveBoard -> aborta, no guarda graph ni ejecuta GC", async () => {
     const repo = createMockRepo();
     (repo.saveBoard as any).mockRejectedValueOnce(new Error("QuotaExceeded"));
 
-    await expect(importProject(repo, projectMock)).rejects.toThrow(
+    await expect(importProject(repo, projectMock as any)).rejects.toThrow(
       "QuotaExceeded",
     );
 
     expect(repo.saveBoard).toHaveBeenCalledTimes(1); // Failed on first board
-    expect(repo.save).not.toHaveBeenCalled(); // Graph is not updated
+    expect(repo.save).not.toHaveBeenCalled(); // Graph is not updated (old graph survives)
     expect(repo.runGarbageCollector).not.toHaveBeenCalled(); // GC is not run
   });
 
-  it("5. Error en save(graph) -> propaga error y NO ejecuta GC", async () => {
+  it("7. Error en save(graph) -> propaga error y NO ejecuta GC", async () => {
     const repo = createMockRepo();
     (repo.save as any).mockRejectedValueOnce(new Error("SaveGraphFailed"));
 
-    await expect(importProject(repo, projectMock)).rejects.toThrow(
+    await expect(importProject(repo, projectMock as any)).rejects.toThrow(
       "SaveGraphFailed",
     );
 
@@ -301,14 +330,14 @@ describe("importProject persistence", () => {
     expect(repo.runGarbageCollector).not.toHaveBeenCalled();
   });
 
-  it("6. Error de GC -> la importación conserva el comportamiento exitoso (no falla todo)", async () => {
+  it("8. Error de GC -> la importación se mantiene exitosa (comportamiento actual)", async () => {
     const repo = createMockRepo();
     (repo.runGarbageCollector as any).mockRejectedValueOnce(
       new Error("GCFailed"),
     );
 
-    // Debería completar sin tirar error
-    await importProject(repo, projectMock);
+    // Debería completar sin tirar error de importación
+    await importProject(repo, projectMock as any);
 
     expect(repo.saveBoard).toHaveBeenCalledTimes(2);
     expect(repo.save).toHaveBeenCalledTimes(1);

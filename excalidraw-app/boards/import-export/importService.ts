@@ -204,25 +204,22 @@ export function validateProjectExport(input: any): ValidationResult {
 
 import type { BoardRepository } from "../repository/BoardRepository";
 
-export class ImportCollisionError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ImportCollisionError";
-  }
-}
-
 /**
  * Persiste un proyecto previamente validado en el repositorio local.
  * NO llama a esta función con datos no validados.
  *
- * Limitación de Atomicidad:
- * - Esta función realiza un preflight estricto para evitar colisiones de BoardId.
- *   Si detecta que el proyecto importado contiene algún board que ya existe en el
- *   proyecto actual, la importación se aborta INMEDIATAMENTE sin realizar ninguna escritura.
- * - Si los IDs del proyecto son nuevos, la operación es "Write-New-Then-Swap",
- *   garantizando que si ocurre un fallo posterior (ej. QuotaExceeded), el graph actual
- *   permanece intacto y el proyecto no se corrompe.
- * - No intentamos remapear IDs para evitar destruir referencias de imágenes o enlaces externos.
+ * Semántica de Importación (Replace Project):
+ * - El proyecto importado reemplaza completamente al proyecto local.
+ * - Los BoardId, FolderId y demás identificadores se conservan exactamente.
+ * - Si un BoardId importado ya existe, se sobrescribe en el lugar.
+ * - Cualquier board local antiguo que ya no esté en el graph importado será recolectado (eliminado) por el Garbage Collector.
+ *
+ * Limitación de Atomicidad (Física):
+ * - Si ocurre un error de almacenamiento (ej. QuotaExceeded) en medio del bucle
+ *   de saveBoard(), el proceso aborta antes de publicar el nuevo Graph maestro.
+ * - Esto evita corromper el Graph, pero significa que algunos payloads locales pueden
+ *   haber sido parcialmente sobrescritos con versiones nuevas. Es una limitación
+ *   física nativa de LocalStorage/IndexedDB que no soporta transacciones.
  */
 export async function importProject(
   repo: BoardRepository,
@@ -230,18 +227,6 @@ export async function importProject(
 ): Promise<void> {
   const { graph, boardsData } = validatedProject;
   const boardIds = Object.keys(boardsData);
-
-  // 0. Preflight: Detección de Colisiones
-  const currentGraph = await repo.load();
-  if (currentGraph) {
-    for (const boardId of boardIds) {
-      if (currentGraph.boards[boardId]) {
-        throw new ImportCollisionError(
-          `Colisión detectada: El board ${boardId} ya existe en el proyecto local. Importación abortada para proteger los datos existentes.`,
-        );
-      }
-    }
-  }
 
   // 1 y 2. Escribir payloads (BoardData) y hacer commit del Graph de forma protegida
   await repo.runWithActiveWrites(boardIds, async () => {
