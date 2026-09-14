@@ -18,7 +18,8 @@ import {
 } from "../host/boardService";
 import { canGoBack, canGoForward } from "../host/navigation";
 
-import { exportWorkspace, importWorkspace } from "../host/workspace";
+import { buildProjectExport, downloadProjectExport } from "../import-export/exportService";
+import { importWorkspace } from "../host/workspace";
 
 import type { FolderId } from "../types";
 import type { BoardRepository } from "../repository/BoardRepository";
@@ -79,14 +80,12 @@ export const NavBar = ({
 
   const handleExport = async () => {
     try {
-      const json = await exportWorkspace(repo);
-      const blob = new Blob([json], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "Workspace.excaliwork";
-      a.click();
-      URL.revokeObjectURL(url);
+      const project = await buildProjectExport(repo);
+      if (!project) {
+        window.alert("No hay proyecto para exportar.");
+        return;
+      }
+      downloadProjectExport(project, "ekade-project.json");
     } catch (err: any) {
       console.error(err);
       window.alert(`Export failed: ${err.message}`);
@@ -96,7 +95,7 @@ export const NavBar = ({
   const handleImport = () => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".excaliwork";
+    input.accept = ".json,.excaliwork";
     input.onchange = async (e: any) => {
       const file = e.target.files?.[0];
       if (!file) {
@@ -170,8 +169,8 @@ export const NavBar = ({
         <button type="button" onClick={handleImport} title="Import Workspace">
           Import
         </button>
-        <button type="button" onClick={handleExport} title="Export Workspace">
-          Export
+        <button type="button" onClick={handleExport} title="Exportar proyecto">
+          Exportar proyecto
         </button>
       </div>
     </div>
