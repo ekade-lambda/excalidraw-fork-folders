@@ -15,6 +15,7 @@ import {
   navigateBack,
   navigateForward,
   navigateToBreadcrumb,
+  saveCurrentBoard,
 } from "../host/boardService";
 import { canGoBack, canGoForward } from "../host/navigation";
 
@@ -42,7 +43,8 @@ export const NavBar = ({
   repo: BoardRepository;
   excalidrawAPI: ExcalidrawImperativeAPI;
 }) => {
-  const { currentFolderId, navigationHistory, graphVersion } = useBoardsState();
+  const { currentBoardId, currentFolderId, navigationHistory, graphVersion } =
+    useBoardsState();
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([]);
 
   // Cargar el grafo y derivar el breadcrumb cuando cambie el folder actual.
@@ -86,6 +88,10 @@ export const NavBar = ({
 
   const handleExport = async () => {
     try {
+      if (currentBoardId) {
+        await saveCurrentBoard(excalidrawAPI, repo, currentBoardId);
+      }
+
       const project = await buildProjectExport(repo);
       if (!project) {
         window.alert("No hay proyecto para exportar.");

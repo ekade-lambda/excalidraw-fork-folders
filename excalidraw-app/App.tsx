@@ -158,7 +158,10 @@ import { sessionClipboardAtom } from "./boards/clipboard";
 import { handleOnCopy } from "./boards/host/copy";
 import { handleOnPaste } from "./boards/host/paste";
 
-import { initializeBoardSystem } from "./boards/host/boardService";
+import {
+  initializeBoardSystem,
+  loadBoardIntoEditor,
+} from "./boards/host/boardService";
 import { startMultiTabSync } from "./boards/host/reconciliation";
 import { LocalStorageBoardRepository } from "./boards/repository/LocalStorageBoardRepository";
 import { createFolder } from "./boards/host/folderService";
@@ -179,7 +182,10 @@ import {
 import { createLinkToFile } from "./boards/link-to-file/host/createLinkToFile";
 import { openLinkToFile } from "./boards/link-to-file/host/openLinkToFile";
 import { hitTestLinkToFileAtPoint } from "./boards/link-to-file/host/hitTestLinkToFile";
-import { LinkToFileContextMenu, type LinkToFileCtx } from "./boards/link-to-file/ui/LinkToFileContextMenu";
+import {
+  LinkToFileContextMenu,
+  type LinkToFileCtx,
+} from "./boards/link-to-file/ui/LinkToFileContextMenu";
 import { getCustomToolExecutionPlan } from "./boards/host/customToolsDispatcher";
 import { NavBar } from "./boards/ui/NavBar";
 import { PickerFolderDialog } from "./boards/ui/PickerFolderDialog";
@@ -519,6 +525,9 @@ const ExcalidrawWrapper = () => {
     initializeBoardSystem(repo)
       .then((bootResult) => {
         if (bootResult && excalidrawAPI) {
+          if (bootResult.boardData) {
+            loadBoardIntoEditor(excalidrawAPI, bootResult.boardData);
+          }
           import("./boards/host/reconciliation").then((m) => {
             m.reconcilePointerNamesInEditor(bootResult.graph, excalidrawAPI);
           });
@@ -562,7 +571,10 @@ const ExcalidrawWrapper = () => {
         }
 
         const parentFolderId = boardsStoreActions.getCurrentFolderId();
-        const plan = getCustomToolExecutionPlan(activeTool.customType, parentFolderId);
+        const plan = getCustomToolExecutionPlan(
+          activeTool.customType,
+          parentFolderId,
+        );
 
         if (plan === "NONE") {
           return;
@@ -607,7 +619,9 @@ const ExcalidrawWrapper = () => {
   // de una Folder o Pointer, abre su Board correspondiente.
 
   // State for Problem 3 (Rename Folder)
-  const [linkToFileCtx, setLinkToFileCtx] = useState<LinkToFileCtx | null>(null);
+  const [linkToFileCtx, setLinkToFileCtx] = useState<LinkToFileCtx | null>(
+    null,
+  );
   const [renameCtx, setRenameCtx] = useState<{
     folderId: string;
     initialName: string;
@@ -653,11 +667,7 @@ const ExcalidrawWrapper = () => {
         handleGlobalPointerDown,
         true,
       );
-      document.removeEventListener(
-        "keydown",
-        handleGlobalKeyDown,
-        true,
-      );
+      document.removeEventListener("keydown", handleGlobalKeyDown, true);
     };
   }, [renameCtx, linkToFileCtx]);
 
@@ -669,13 +679,19 @@ const ExcalidrawWrapper = () => {
 
     let rafId: number;
     const syncPosition = () => {
-      const menuElement = document.querySelector(".context-menu") as HTMLElement | null;
-      const renameElement = document.querySelector(".board-rename-ui") as HTMLElement | null;
-      const linkToFileElement = document.querySelector(".link-to-file-ui") as HTMLElement | null;
+      const menuElement = document.querySelector(
+        ".context-menu",
+      ) as HTMLElement | null;
+      const renameElement = document.querySelector(
+        ".board-rename-ui",
+      ) as HTMLElement | null;
+      const linkToFileElement = document.querySelector(
+        ".link-to-file-ui",
+      ) as HTMLElement | null;
 
       if (menuElement) {
         const menuRect = menuElement.getBoundingClientRect();
-        
+
         if (renameElement) {
           renameElement.style.left = `${menuRect.right}px`;
           renameElement.style.top = `${menuRect.top}px`;
@@ -693,8 +709,6 @@ const ExcalidrawWrapper = () => {
     return () => cancelAnimationFrame(rafId);
   }, [renameCtx, linkToFileCtx]);
 
-
-
   const handleHostContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!excalidrawAPI) {
       return;
@@ -706,18 +720,17 @@ const ExcalidrawWrapper = () => {
     );
     const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
     const hit = hitTestFolderAtPoint(elements, { x: sceneX, y: sceneY });
-    const linkHit = hitTestLinkToFileAtPoint(elements, { x: sceneX, y: sceneY });
+    const linkHit = hitTestLinkToFileAtPoint(elements, {
+      x: sceneX,
+      y: sceneY,
+    });
 
     if (hit.kind === "folder") {
       const fId = hit.folderId;
       let initialName = "";
       for (const el of elements) {
         const m = el.customData?.folderBoard;
-        if (
-          m &&
-          m.folderId === fId &&
-          m.role === "text"
-        ) {
+        if (m && m.folderId === fId && m.role === "text") {
           initialName = (el as any).text || "";
           break;
         }
@@ -767,7 +780,9 @@ const ExcalidrawWrapper = () => {
     setRenameCtx(null);
   };
 
-  const handleCanvasDoubleClickCapture = (event: React.MouseEvent<HTMLDivElement>) => {
+  const handleCanvasDoubleClickCapture = (
+    event: React.MouseEvent<HTMLDivElement>,
+  ) => {
     if (!excalidrawAPI) {
       return;
     }
@@ -776,7 +791,7 @@ const ExcalidrawWrapper = () => {
       excalidrawAPI.getAppState(),
     );
     const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
-    
+
     // Fase 6: Link to File intercept (evita que el double click llegue a Excalidraw)
     const linkHit = hitTestLinkToFileAtPoint(elements, { x, y });
     if (linkHit.hit && linkHit.element && linkHit.linkData) {
@@ -1396,9 +1411,18 @@ const ExcalidrawWrapper = () => {
                 order: 1,
               }}
             >
-              <FolderToolButton excalidrawAPI={excalidrawAPI} activeTool={appState.activeTool} />
-              <FolderPointerToolButton excalidrawAPI={excalidrawAPI} activeTool={appState.activeTool} />
-              <LinkToFileToolButton excalidrawAPI={excalidrawAPI} activeTool={appState.activeTool} />
+              <FolderToolButton
+                excalidrawAPI={excalidrawAPI}
+                activeTool={appState.activeTool}
+              />
+              <FolderPointerToolButton
+                excalidrawAPI={excalidrawAPI}
+                activeTool={appState.activeTool}
+              />
+              <LinkToFileToolButton
+                excalidrawAPI={excalidrawAPI}
+                activeTool={appState.activeTool}
+              />
               <NavBar repo={boardRepo} excalidrawAPI={excalidrawAPI} />
             </div>
           );
@@ -1847,7 +1871,3 @@ const ExcalidrawApp = () => {
 };
 
 export default ExcalidrawApp;
-
-
-
-
