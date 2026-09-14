@@ -204,20 +204,25 @@ export function validateProjectExport(input: any): ValidationResult {
 
 import type { BoardRepository } from "../repository/BoardRepository";
 
+export class ImportCollisionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ImportCollisionError";
+  }
+}
+
 /**
  * Persiste un proyecto previamente validado en el repositorio local.
  * NO llama a esta función con datos no validados.
  *
  * Limitación de Atomicidad:
+ * - Esta función realiza un preflight estricto para evitar colisiones de BoardId.
+ *   Si detecta que el proyecto importado contiene algún board que ya existe en el
+ *   proyecto actual, la importación se aborta INMEDIATAMENTE sin realizar ninguna escritura.
  * - Si los IDs del proyecto son nuevos, la operación es "Write-New-Then-Swap",
- *   garantizando que si ocurre un fallo (ej. QuotaExceeded), el graph actual
+ *   garantizando que si ocurre un fallo posterior (ej. QuotaExceeded), el graph actual
  *   permanece intacto y el proyecto no se corrompe.
- * - Si los IDs colisionan con un proyecto existente (ej. importando una versión anterior
- *   del mismo proyecto), `saveBoard` sobrescribirá los boards existentes en el acto.
- *   Si el proceso falla a medias en este escenario, el proyecto quedará en un estado
- *   híbrido (corrompido). Cambiar todos los IDs importados (UUIDs de boards, folders,
- *   punteros, fileIds dentro de elementos) es demasiado complejo y destructivo para
- *   las referencias internas, por lo que asumimos este riesgo como un "best effort".
+ * - No intentamos remapear IDs para evitar destruir referencias de imágenes o enlaces externos.
  */
 export async function importProject(
   repo: BoardRepository,
@@ -225,6 +230,18 @@ export async function importProject(
 ): Promise<void> {
   const { graph, boardsData } = validatedProject;
   const boardIds = Object.keys(boardsData);
+
+  // 0. Preflight: Detección de Colisiones
+  const currentGraph = await repo.load();
+  if (currentGraph) {
+    for (const boardId of boardIds) {
+      if (currentGraph.boards[boardId]) {
+        throw new ImportCollisionError(
+          `Colisión detectada: El board ${boardId} ya existe en el proyecto local. Importación abortada para proteger los datos existentes.`,
+        );
+      }
+    }
+  }
 
   // 1 y 2. Escribir payloads (BoardData) y hacer commit del Graph de forma protegida
   await repo.runWithActiveWrites(boardIds, async () => {
