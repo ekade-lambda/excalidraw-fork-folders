@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import { buildProjectExport } from "./exportService";
 import type { BoardRepository } from "../repository/BoardRepository";
 import type { BoardsGraph, BoardData } from "../types";
+import type { FileId } from "@excalidraw/element/types";
+import type { DataURL } from "@excalidraw/excalidraw/types";
 
 describe("exportService", () => {
   it("should build export object correctly", async () => {
@@ -28,9 +30,9 @@ describe("exportService", () => {
       elements: [],
       files: {
         "file-1": {
-          id: "file-1",
+          id: "file-1" as FileId,
           mimeType: "image/png",
-          dataURL: "data:image/png;base64,mock",
+          dataURL: "data:image/png;base64,mock" as DataURL,
           created: 0,
         },
       },
@@ -58,10 +60,12 @@ describe("exportService", () => {
     expect(result?.version).toBe(1);
     expect(result?.graph).toEqual(mockGraph);
     expect(result?.boardsData["b-1"]).toEqual(mockBoardData);
-    
+
     // Check that files are preserved
     expect(result?.boardsData["b-1"].files["file-1"]).toBeDefined();
-    expect(result?.boardsData["b-1"].files["file-1"].dataURL).toBe("data:image/png;base64,mock");
+    expect(result?.boardsData["b-1"].files["file-1"].dataURL).toBe(
+      "data:image/png;base64,mock",
+    );
   });
 
   it("should return null if graph is missing", async () => {
