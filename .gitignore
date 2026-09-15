@@ -27,3 +27,6 @@ dev-dist
 html
 meta*.json
 .claude
+
+# Excalifile Bridge
+bridge/target/
